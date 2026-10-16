@@ -141,6 +141,9 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
 .sheet p{margin:0 0 12px;font-size:14.5px;color:var(--muted)}
 .sheet textarea{width:100%;height:46vh;height:46dvh;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:16px/1.45 "Barlow",system-ui,sans-serif;padding:10px;resize:none;-webkit-user-select:text;user-select:text}
 .rest{font-weight:500;color:var(--muted)}
+.event .evmeta{font-family:"Barlow",sans-serif;font-size:13.5px;font-weight:500;opacity:.8;margin-top:6px}
+.lineup{padding:6px 0;font-size:15px}.lineup + .lineup{border-top:1px solid var(--line)}
+.lineup b{font-family:"Barlow Condensed",sans-serif;font-size:17px}
 .rules{margin:6px 0 0;padding:0;list-style:none;counter-reset:r}
 .rules li{counter-increment:r;display:grid;grid-template-columns:36px 1fr;gap:10px;align-items:start;padding:12px 2px;border-bottom:1px solid var(--line);font-size:16px}
 .rules li::before{content:counter(r);font-family:Anton,sans-serif;font-size:22px;line-height:1.1;color:var(--red);text-align:center}
@@ -158,7 +161,7 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
   <div class="inner">
     <div class="title">
       <h1>Malaysiano Tour</h1>
-      <p>Season 1 rankings, every stop counts</p>
+      <p>Season 1 rankings, every session counts</p>
     </div>
     <div class="stars" aria-hidden="true">
       <img class="omar" src="img/omar.webp" alt="">
@@ -168,10 +171,10 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
 </header>
 <div class="wrap">
   <nav class="tabs" role="tablist">
-    <button role="tab" data-tab="rank" aria-selected="true">Rankings</button>
-    <button role="tab" data-tab="stops" aria-selected="false">Matches</button>
+    <button role="tab" data-tab="session" aria-selected="true">Session</button>
+    <button role="tab" data-tab="tour" aria-selected="false">Tour</button>
+    <button role="tab" data-tab="past" aria-selected="false">Past</button>
     <button role="tab" data-tab="rules" aria-selected="false">Rules</button>
-    <button role="tab" data-tab="players" aria-selected="false">Players</button>
   </nav>
   <main id="main"></main>
   <div class="org" id="org"></div>
@@ -210,7 +213,7 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
 <div class="sheet" id="adminSheet" role="dialog" aria-modal="true" aria-labelledby="adminTitle">
   <div class="panel">
     <h3 id="adminTitle">Organiser tools</h3>
-    <p>Enter the Admin PIN to add players, tour stops and matches, or delete matches.</p>
+    <p>Enter the Admin PIN to add players, sessions and matches, or delete matches.</p>
     <div class="field"><label for="adminPin">Admin PIN</label><input id="adminPin" type="password" inputmode="numeric" autocomplete="off" maxlength="12"></div>
     <div class="msg" id="adminMsg"></div>
     <div class="actions">
@@ -243,7 +246,8 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
   function lsSet(k, v){ try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch(e){} }
   function ssGet(k){ try { return sessionStorage.getItem(k); } catch(e){ return null; } }
   function ssSet(k, v){ try { if (v === null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch(e){} }
-  UI.tab = lsGet("mt-tab") || "rank";
+  UI.tab = lsGet("mt-tab") || "session";
+  if (["session","tour","past","rules"].indexOf(UI.tab) < 0) UI.tab = "session";
   try { var w = JSON.parse(lsGet("mt-who") || "null"); if (w && w.name) who = w; } catch(e){}
   adminPin = ssGet("mt-admin") || "";
 
@@ -401,10 +405,10 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
       return;
     }
     if (S.error) main.appendChild(el("div",{cls:"status bad", text:S.error}));
-    if (UI.tab === "rank") renderRank(main);
-    else if (UI.tab === "stops") renderStops(main);
+    if (UI.tab === "tour"){ renderRank(main); renderPlayers(main); }
+    else if (UI.tab === "past") renderPast(main);
     else if (UI.tab === "rules") renderRules(main);
-    else renderPlayers(main);
+    else renderSession(main);
   }
 
   function renderOrg(){
@@ -428,7 +432,7 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
     main.appendChild(seg);
     var rows = boardRows(C, UI.board);
     var nstops = sortedStops().filter(function(s){ return stopMatches(s.id).some(scored); }).length;
-    main.appendChild(el("p",{cls:"note", text: C.played ? ("Ratings start at 1000 and move after every game, based on the result, the score margin and how strong the opponents were. " + nstops + (nstops === 1 ? " stop" : " stops") + " played so far.") : "Rankings appear once the first scores are in."}));
+    main.appendChild(el("p",{cls:"note", text: C.played ? ("Season-long Malaysiano Tour ranking across every session. Ratings start at 1000 and move after every game, based on the result, the score margin and how strong the opponents were. " + nstops + (nstops === 1 ? " session" : " sessions") + " played so far.") : "Rankings appear once the first scores are in."}));
     if (UI.board === "D"){
       var tg = el("button",{cls:"btn ghost", text: UI.allPairs ? "Show regular pairs only" : "Show all pairs, including one-off pairings", onclick:function(){ UI.allPairs = !UI.allPairs; render(); }});
       tg.style.cssText = "width:100%;margin-bottom:6px;font-size:14px;padding:9px";
@@ -472,23 +476,42 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
     return out.join("\n").trim();
   }
 
-  function renderStops(main){
-    var stops = sortedStops();
-    if (!UI.stop || (UI.stop !== "__new" && !S.stops[UI.stop])) UI.stop = stops.length ? stops[stops.length-1].id : null;
-    if (UI.stop === "__new" && !isAdmin()) UI.stop = stops.length ? stops[stops.length-1].id : null;
-    var chips = el("div",{cls:"chips", role:"group", "aria-label":"Tour stops"});
-    stops.forEach(function(s){ chips.appendChild(el("button",{text:s.name, "aria-pressed": UI.stop === s.id ? "true" : "false", onclick:function(){ UI.stop = s.id; render(); }})); });
-    if (isAdmin()) chips.appendChild(el("button",{text:"+ New stop", "aria-pressed": UI.stop === "__new" ? "true" : "false", onclick:function(){ UI.stop = "__new"; render(); }}));
+  function currentStop(){ var st = sortedStops(); return st.length ? st[st.length-1] : null; }
+
+  function renderSession(main){
+    if (UI.newStop && isAdmin()){
+      main.appendChild(newStopForm(sortedStops().length + 1));
+      main.appendChild(el("button",{cls:"btn ghost wide", text:"Cancel", onclick:function(){ UI.newStop = false; render(); }}));
+      return;
+    }
+    var stop = currentStop();
+    if (!stop){ main.appendChild(el("div",{cls:"empty", text: isAdmin() ? "Start the first session to begin." : "No session yet."})); }
+    else renderStopBody(main, stop);
+    if (isAdmin()){
+      var nb = el("button",{cls:"btn ghost wide", text:"+ Start a new session", onclick:function(){ UI.newStop = true; render(); window.scrollTo(0,0); }});
+      nb.style.marginTop = "12px"; main.appendChild(nb);
+      main.appendChild(el("p",{cls:"note", text:"Starting a new session moves this one to Past."}));
+    }
+  }
+
+  function renderPast(main){
+    var cur = currentStop();
+    var past = sortedStops().filter(function(s){ return !cur || s.id !== cur.id; }).reverse();
+    if (!past.length){ main.appendChild(el("div",{cls:"empty", text:"No past sessions yet. After this week, its results will be kept here."})); return; }
+    if (!UI.stop || !past.some(function(s){ return s.id === UI.stop; })) UI.stop = past[0].id;
+    var chips = el("div",{cls:"chips", role:"group", "aria-label":"Past sessions"});
+    past.forEach(function(s){ chips.appendChild(el("button",{text:s.name, "aria-pressed": UI.stop === s.id ? "true" : "false", onclick:function(){ UI.stop = s.id; render(); }})); });
     main.appendChild(chips);
-    if (UI.stop === "__new"){ main.appendChild(newStopForm(stops.length + 1)); return; }
-    if (!UI.stop){ main.appendChild(el("div",{cls:"empty", text: isAdmin() ? "Add the first tour stop to start entering scores." : "No tour stops yet."})); return; }
-    var stop = S.stops[UI.stop];
+    renderStopBody(main, S.stops[UI.stop]);
+  }
+
+  function renderStopBody(main, stop){
     var ms = stopMatches(stop.id);
     var done = ms.filter(scored).length;
-    main.appendChild(el("div",{cls:"stophead"},[
-      el("div",null,[el("h2",{text:stop.name}), el("div",{cls:"meta", text:[fmtDate(stop.date), stop.time, stop.venue, stop.total ? ("Games to " + stop.total + " points total") : ""].filter(Boolean).join("  ·  ")})]),
-      el("div",{cls:"meta", text: done + " of " + ms.length + " scored"})
-    ]));
+    var ev = el("div",{cls:"event"},[el("h2",{text:stop.name})]);
+    [fmtDate(stop.date), stop.time, stop.venue].filter(Boolean).forEach(function(t){ ev.appendChild(el("div",{text:t})); });
+    if (ms.length) ev.appendChild(el("div",{cls:"evmeta", text:(stop.total ? "Games to " + stop.total + " points total  ·  " : "") + done + " of " + ms.length + " games scored"}));
+    main.appendChild(ev);
     if (ms.length){
       main.appendChild(el("p",{cls:"note", text: stop.total ? "Tap a score box to enter a result. Type one team's score and the other fills in by itself." : "Tap a score box to enter a result."}));
       var bar = el("div",{cls:"who-bar"});
@@ -501,6 +524,15 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
     var cups = []; var byCup = {};
     ms.forEach(function(m){ var c = m.cup || "Cup"; if (!byCup[c]){ byCup[c] = []; cups.push(c); } byCup[c].push(m); });
     if (!ms.length) main.appendChild(el("div",{cls:"empty", text: isAdmin() ? "No matches yet. Add them below." : "No matches yet."}));
+    if (cups.length){
+      var lu = el("div",{cls:"card"},[el("h3",{text:"Players this session"})]);
+      cups.forEach(function(c){
+        var ids = {}; byCup[c].forEach(function(m){ m.a.concat(m.b).forEach(function(id){ ids[id] = 1; }); });
+        var names = Object.keys(ids).map(nameOf).sort(function(x,y){ return x.localeCompare(y); });
+        lu.appendChild(el("div",{cls:"lineup"},[el("b",{text:c + " (" + names.length + ")"}), el("div",{text:names.join(", ")})]));
+      });
+      main.appendChild(lu);
+    }
     cups.forEach(function(c){
       var list = byCup[c];
       main.appendChild(el("div",{cls:"cup"},[el("h3",{text:c}), el("span",{text: list.filter(scored).length + "/" + list.length + " scored"})]));
@@ -708,7 +740,7 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
   }
 
   function newStopForm(n){
-    var card = el("div",{cls:"card"},[el("h3",{text:"New tour stop"})]);
+    var card = el("div",{cls:"card"},[el("h3",{text:"Start a new session"})]);
     var nm = el("input",{type:"text", value:"Tour Stop " + n});
     var dt = el("input",{type:"date", value:new Date().toISOString().slice(0,10)});
     var tm = el("input",{type:"text", placeholder:"e.g. 8:45am – 12:00pm"});
@@ -722,12 +754,12 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
     card.appendChild(el("div",{cls:"field"},[el("label",{text:"Total points per game, if fixed"}), tot]));
     card.appendChild(el("p",{cls:"note", text:"If games are played to a fixed total (like 21), the second score fills in by itself. Ratings work with any format."}));
     card.appendChild(msg);
-    var btn = el("button",{cls:"btn primary wide", text:"Create stop", onclick:function(){
-      if (!nm.value.trim()) { msg.textContent = "Give the stop a name."; return; }
+    var btn = el("button",{cls:"btn primary wide", text:"Create session", onclick:function(){
+      if (!nm.value.trim()) { msg.textContent = "Give the session a name."; return; }
       btn.disabled = true; btn.textContent = "Creating…";
       adminPost({action:"addStop", name:nm.value, date:dt.value, time:tm.value, venue:vn.value, total:tot.value}).then(function(res){
-        btn.disabled = false; btn.textContent = "Create stop";
-        if (res.ok){ UI.stop = res.id; if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); load(); }
+        btn.disabled = false; btn.textContent = "Create session";
+        if (res.ok){ UI.newStop = false; UI.tab = "session"; if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); load(); }
         else msg.textContent = res.error;
       });
     }});
@@ -758,10 +790,12 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
       main.appendChild(card);
     }
     if (!ps.length){ main.appendChild(el("div",{cls:"empty", text:"No players yet."})); return; }
+    var hd = el("div",{cls:"cup"},[el("h3",{text:"Tour players"}), el("span",{text:ps.length + " players"})]);
+    hd.style.marginTop = "28px"; main.appendChild(hd);
     var ul = el("ul",{cls:"plist"});
     ps.forEach(function(p){
       var x = C.st[p.id];
-      ul.appendChild(el("li",null,[el("div",null,[el("b",{text:p.name}), document.createTextNode("  "), el("span",{text: p.gender === "F" ? "Women" : "Men"})]), el("span",{text: x ? (x.games + " games, " + Object.keys(x.stops).length + (Object.keys(x.stops).length === 1 ? " stop" : " stops")) : "Not played yet"})]));
+      ul.appendChild(el("li",null,[el("div",null,[el("b",{text:p.name}), document.createTextNode("  "), el("span",{text: p.gender === "F" ? "Women" : "Men"})]), el("span",{text: x ? (x.games + (x.games === 1 ? " game, " : " games, ") + Object.keys(x.stops).length + (Object.keys(x.stops).length === 1 ? " session" : " sessions")) : "Not played yet"})]));
     });
     main.appendChild(ul);
   }
