@@ -6,17 +6,30 @@
  * 2. Deploy → New deployment → Web app, Execute as: Me, Who has access: Anyone.
  * 3. Copy the Web app URL (ends in /exec) into index.html.
  *
- * Tabs: Players, Stops, Matches, ScoreLog, Settings.
+ * Tabs: Players, Stops, Matches, ScoreLog, Settings, Rules.
+ * Running setup again later is safe: it only adds tabs or columns that are missing.
  * PINs live in the Settings tab and are never sent to the website.
  */
 
 var TABS = {
   Players: ['id', 'name', 'gender', 'joined'],
-  Stops: ['id', 'name', 'date', 'venue', 'total', 'created'],
+  Stops: ['id', 'name', 'date', 'venue', 'total', 'created', 'time'],
   Matches: ['id', 'stop', 'cup', 'round', 'time', 'court', 'a1', 'a2', 'b1', 'b2', 'sa', 'sb', 'seq', 'enteredBy', 'updated'],
   ScoreLog: ['time', 'name', 'matchId', 'match', 'oldScore', 'newScore'],
-  Settings: ['key', 'value', 'note']
+  Settings: ['key', 'value', 'note'],
+  Rules: ['rule']
 };
+
+var DEFAULT_RULES = [
+  'Every game is 21 points in total (e.g. 12–9). No draws.',
+  'Serve rotates every 4 points.',
+  'Each player collects their own points from the team score.',
+  'When your court finishes, start the next round straight away.',
+  'Back-to-back games stay on the same court.',
+  'Injured or tired? A resting player fills in.',
+  'Mixed doubles: if the score is tied at 10–10 for the winning point, men may not serve to ladies.',
+  'Highest points wins each cup. Top 3 in each cup get gold, silver and bronze medals.'
+];
 
 /* ------------------------------------------------------------------ */
 /* One-time setup                                                     */
@@ -26,10 +39,9 @@ function setup() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   Object.keys(TABS).forEach(function (name) {
     var sh = ss.getSheetByName(name) || ss.insertSheet(name);
-    if (sh.getLastRow() === 0) {
-      sh.getRange(1, 1, 1, TABS[name].length).setValues([TABS[name]]).setFontWeight('bold');
-      sh.setFrozenRows(1);
-    }
+    // Writes the header row, which also adds any new columns to tabs made by an older version.
+    sh.getRange(1, 1, 1, TABS[name].length).setValues([TABS[name]]).setFontWeight('bold');
+    sh.setFrozenRows(1);
     // Plain text everywhere so Sheets doesn't turn dates, times or ids into something else.
     sh.getRange(1, 1, sh.getMaxRows(), TABS[name].length).setNumberFormat('@');
   });
@@ -42,6 +54,12 @@ function setup() {
       ['ScorePIN', '1710', 'Share with the group. Needed to enter scores. Change it any week.'],
       ['AdminPIN', '2468', 'Only you. Needed to add players, stops and matches, and delete matches.']
     ]);
+  }
+
+  var rules = ss.getSheetByName('Rules');
+  if (rules.getLastRow() < 2) {
+    rules.getRange(2, 1, DEFAULT_RULES.length, 1).setValues(DEFAULT_RULES.map(function (r) { return [r]; }));
+    rules.setColumnWidth(1, 700);
   }
 
   var now = new Date().toISOString();
@@ -58,7 +76,7 @@ function setup() {
 
   var stops = ss.getSheetByName('Stops');
   if (stops.getLastRow() < 2) {
-    stops.getRange(2, 1, 1, 6).setValues([['stop-1', 'Tour Stop 1', '2026-10-17', 'Padel In Ar Rabwah', '21', now]]);
+    stops.getRange(2, 1, 1, 7).setValues([['stop-1', 'Tour Stop 1', '2026-10-17', 'Padel In Ar Rabwah', '21', now, '8:45am – 12:00pm']]);
   }
 
   var matches = ss.getSheetByName('Matches');
@@ -181,7 +199,7 @@ function addStop(req) {
   var date = /^\d{4}-\d{2}-\d{2}$/.test(req.date || '') ? req.date : '';
   var total = parseInt(req.total, 10);
   var id = 'stop-' + Date.now().toString(36);
-  sheet('Stops').appendRow([id, name, date, cleanText(req.venue, 60), isNaN(total) ? '' : String(total), new Date().toISOString()]);
+  sheet('Stops').appendRow([id, name, date, cleanText(req.venue, 60), isNaN(total) ? '' : String(total), new Date().toISOString(), cleanText(req.time, 40)]);
   return { ok: true, id: id };
 }
 
@@ -217,7 +235,7 @@ function deleteMatch(req) {
 function readAll() {
   var players = rows('Players').map(function (p) { return { id: p.id, name: p.name, gender: p.gender === 'F' ? 'F' : 'M' }; });
   var stops = rows('Stops').map(function (s) {
-    return { id: s.id, name: s.name, date: s.date, venue: s.venue, total: num(s.total), created: s.created };
+    return { id: s.id, name: s.name, date: s.date, venue: s.venue, total: num(s.total), created: s.created, time: s.time };
   });
   var matches = rows('Matches').map(function (m) {
     return {
@@ -226,7 +244,9 @@ function readAll() {
       enteredBy: m.enteredBy, updated: m.updated
     };
   });
-  return { ok: true, players: players, stops: stops, matches: matches };
+  var ruleTab = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Rules');
+  var rules = ruleTab ? rows('Rules').map(function (r) { return r.rule; }).filter(String) : null;
+  return { ok: true, players: players, stops: stops, matches: matches, rules: rules };
 }
 
 function rows(tab) {

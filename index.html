@@ -42,24 +42,21 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:"Barlow",system-
 .wrap{max-width:620px;margin:0 auto;padding:0 14px 48px}
 
 header.top{background:var(--brand);color:var(--brand-ink);padding:calc(20px + env(safe-area-inset-top,0px)) 18px 0;position:relative;overflow:hidden}
-header.top .inner{max-width:620px;margin:0 auto;position:relative;min-height:228px}
-header.top .title{position:relative;z-index:2;max-width:58%;padding-bottom:18px}
-header.top h1{margin:0;font-family:Anton,"Barlow Condensed",sans-serif;font-weight:400;font-size:44px;line-height:.95;color:var(--gold);letter-spacing:.5px;text-shadow:0 2px 12px rgba(10,26,63,.6)}
-header.top p{margin:8px 0 0;font-family:"Barlow Condensed",sans-serif;font-size:18px;font-weight:600;opacity:.92}
+header.top .inner{max-width:620px;margin:0 auto;position:relative;min-height:150px}
+header.top .title{position:relative;z-index:2;max-width:56%;padding-bottom:16px}
+header.top h1{margin:0;font-family:Anton,"Barlow Condensed",sans-serif;font-weight:400;font-size:40px;line-height:.95;color:var(--gold);letter-spacing:.5px;text-shadow:0 2px 12px rgba(10,26,63,.6)}
+header.top p{margin:8px 0 0;font-family:"Barlow Condensed",sans-serif;font-size:17px;font-weight:600;opacity:.92}
 header.top .stripe{position:absolute;right:-40px;top:0;bottom:0;width:150px;background:var(--red);transform:skewX(-14deg);opacity:.95}
 header.top .stripe2{position:absolute;right:120px;top:0;bottom:0;width:14px;background:var(--gold);transform:skewX(-14deg)}
-.stars{position:absolute;right:-6px;bottom:0;width:250px;height:228px;z-index:1;pointer-events:none}
-.stars img{position:absolute;bottom:0;height:100%;width:auto;display:block;filter:drop-shadow(0 4px 10px rgba(0,0,0,.35))}
-.stars .du{left:0;height:228px}
-.stars .omar{right:0;height:184px}
-.stars span{position:absolute;bottom:6px;font-family:Anton,"Barlow Condensed",sans-serif;font-size:15px;letter-spacing:2px;color:var(--gold);background:var(--brand);padding:1px 7px 0;border-radius:3px;z-index:2}
-.stars .ldu{left:30px}
-.stars .lomar{right:40px}
-@media (min-width:560px){header.top .inner{min-height:260px}.stars{width:300px;height:260px}.stars .du{height:260px}.stars .omar{height:212px}header.top h1{font-size:56px}}
-@media (max-width:350px){header.top .title{max-width:62%}.stars{width:190px;height:190px}.stars .du{height:190px}.stars .omar{height:150px}.stars .ldu{left:22px}.stars .lomar{right:28px}}
+.stars{position:absolute;right:-8px;bottom:0;width:200px;height:150px;z-index:1;pointer-events:none}
+.stars img{position:absolute;bottom:0;width:auto;display:block;filter:drop-shadow(0 4px 10px rgba(0,0,0,.35))}
+.stars .du{left:0;height:150px}
+.stars .omar{right:0;height:126px}
+@media (min-width:560px){header.top .inner{min-height:180px}.stars{width:250px;height:180px}.stars .du{height:180px}.stars .omar{height:152px}header.top h1{font-size:52px}}
+@media (max-width:350px){header.top h1{font-size:34px}.stars{width:170px;height:130px}.stars .du{height:130px}.stars .omar{height:110px}}
 
-nav.tabs{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;gap:6px;padding:calc(12px + env(safe-area-inset-top,0px)) 0 10px;margin-top:calc(-1 * env(safe-area-inset-top,0px));border-bottom:1px solid var(--line)}
-nav.tabs button{flex:1;border:1.5px solid var(--line);background:var(--surface);font-weight:600;font-size:15px;padding:9px 4px;border-radius:999px;cursor:pointer;white-space:nowrap}
+nav.tabs{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;gap:5px;padding:calc(12px + env(safe-area-inset-top,0px)) 0 10px;margin-top:calc(-1 * env(safe-area-inset-top,0px));border-bottom:1px solid var(--line)}
+nav.tabs button{flex:1;min-width:0;border:1.5px solid var(--line);background:var(--surface);font-weight:600;font-size:15px;padding:9px 2px;border-radius:999px;cursor:pointer;white-space:nowrap}
 nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 :focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 
@@ -143,6 +140,14 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
 .sheet h3{margin:0 0 8px;font-family:"Barlow Condensed",sans-serif;font-size:22px}
 .sheet p{margin:0 0 12px;font-size:14.5px;color:var(--muted)}
 .sheet textarea{width:100%;height:46vh;height:46dvh;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:16px/1.45 "Barlow",system-ui,sans-serif;padding:10px;resize:none;-webkit-user-select:text;user-select:text}
+.rest{font-weight:500;color:var(--muted)}
+.rules{margin:6px 0 0;padding:0;list-style:none;counter-reset:r}
+.rules li{counter-increment:r;display:grid;grid-template-columns:36px 1fr;gap:10px;align-items:start;padding:12px 2px;border-bottom:1px solid var(--line);font-size:16px}
+.rules li::before{content:counter(r);font-family:Anton,sans-serif;font-size:22px;line-height:1.1;color:var(--red);text-align:center}
+.event{background:var(--brand);color:#fff;border-radius:14px;padding:14px 16px;margin:14px 0}
+.event h2{margin:0 0 6px;font-family:Anton,sans-serif;font-weight:400;font-size:26px;color:var(--gold)}
+.event div{font-family:"Barlow Condensed",sans-serif;font-size:18px;font-weight:600}
+@media (max-width:350px){nav.tabs button{font-size:14px}}
 [hidden]{display:none!important}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -158,14 +163,14 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
     <div class="stars" aria-hidden="true">
       <img class="omar" src="img/omar.webp" alt="">
       <img class="du" src="img/du.webp" alt="">
-      <span class="ldu">DU</span><span class="lomar">OMAR</span>
     </div>
   </div>
 </header>
 <div class="wrap">
   <nav class="tabs" role="tablist">
     <button role="tab" data-tab="rank" aria-selected="true">Rankings</button>
-    <button role="tab" data-tab="stops" aria-selected="false">Tour stops</button>
+    <button role="tab" data-tab="stops" aria-selected="false">Matches</button>
+    <button role="tab" data-tab="rules" aria-selected="false">Rules</button>
     <button role="tab" data-tab="players" aria-selected="false">Players</button>
   </nav>
   <main id="main"></main>
@@ -217,7 +222,17 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
 
 <script>
 (function(){
-  var S = {players:{}, stops:{}, matches:{}, state:"loading", error:"", loadedAt:null};
+  var S = {players:{}, stops:{}, matches:{}, rules:null, state:"loading", error:"", loadedAt:null};
+  var DEFAULT_RULES = [
+    "Every game is 21 points in total (e.g. 12–9). No draws.",
+    "Serve rotates every 4 points.",
+    "Each player collects their own points from the team score.",
+    "When your court finishes, start the next round straight away.",
+    "Back-to-back games stay on the same court.",
+    "Injured or tired? A resting player fills in.",
+    "Mixed doubles: if the score is tied at 10–10 for the winning point, men may not serve to ladies.",
+    "Highest points wins each cup. Top 3 in each cup get gold, silver and bronze medals."
+  ];
   var UI = {tab:"rank", board:"M", allPairs:false, stop:null, pendingRender:false};
   var pending = {};          // matchId -> {sa, sb} not yet confirmed by the sheet
   var status = {};           // matchId -> "Saving…" / error text
@@ -273,6 +288,7 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
       M[m.id] = m;
     });
     S.players = P; S.stops = St; S.matches = M;
+    S.rules = (data.rules && data.rules.length) ? data.rules : null;
   }
   function load(quiet){
     if (!configured) return Promise.resolve();
@@ -387,6 +403,7 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
     if (S.error) main.appendChild(el("div",{cls:"status bad", text:S.error}));
     if (UI.tab === "rank") renderRank(main);
     else if (UI.tab === "stops") renderStops(main);
+    else if (UI.tab === "rules") renderRules(main);
     else renderPlayers(main);
   }
 
@@ -469,7 +486,7 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
     var ms = stopMatches(stop.id);
     var done = ms.filter(scored).length;
     main.appendChild(el("div",{cls:"stophead"},[
-      el("div",null,[el("h2",{text:stop.name}), el("div",{cls:"meta", text:[fmtDate(stop.date), stop.venue, stop.total ? ("Games to " + stop.total + " points total") : ""].filter(Boolean).join("  ·  ")})]),
+      el("div",null,[el("h2",{text:stop.name}), el("div",{cls:"meta", text:[fmtDate(stop.date), stop.time, stop.venue, stop.total ? ("Games to " + stop.total + " points total") : ""].filter(Boolean).join("  ·  ")})]),
       el("div",{cls:"meta", text: done + " of " + ms.length + " scored"})
     ]));
     if (ms.length){
@@ -489,7 +506,11 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
       main.appendChild(el("div",{cls:"cup"},[el("h3",{text:c}), el("span",{text: list.filter(scored).length + "/" + list.length + " scored"})]));
       var lastR = null;
       list.forEach(function(m){
-        if (m.round !== lastR){ lastR = m.round; main.appendChild(el("div",{cls:"rnd", text:"Round " + m.round + (m.time ? ", " + m.time : "")})); }
+        if (m.round !== lastR){
+          lastR = m.round;
+          var rest = resting(list, m.round);
+          main.appendChild(el("div",{cls:"rnd"},["Round " + m.round + (m.time ? ", " + m.time : ""), rest.length ? el("span",{cls:"rest", text:"  ·  Rest: " + rest.map(nameOf).join(", ")}) : null]));
+        }
         main.appendChild(matchCard(m, stop));
       });
       var tbl = cupTable(list);
@@ -502,10 +523,56 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
       }
     });
     if (isAdmin()) main.appendChild(addMatchForm(stop, cups, ms));
+    if (ms.length){
+      var shs = el("button",{cls:"btn ghost wide", text:"Share " + stop.name + " schedule", onclick:function(){ openShare(scheduleText(stop, cups, byCup)); }});
+      shs.style.marginTop = "12px"; main.appendChild(shs);
+    }
     if (done){
       var sh = el("button",{cls:"btn ghost wide", text:"Share " + stop.name + " standings", onclick:function(){ openShare(stopText(stop, cups, byCup)); }});
       sh.style.marginTop = "12px"; main.appendChild(sh);
     }
+  }
+
+  function resting(list, round){
+    var inCup = {}, inRound = {};
+    list.forEach(function(m){ m.a.concat(m.b).forEach(function(id){ inCup[id] = 1; if (m.round === round) inRound[id] = 1; }); });
+    return Object.keys(inCup).filter(function(id){ return !inRound[id]; }).sort(function(a,b){ return nameOf(a).localeCompare(nameOf(b)); });
+  }
+
+  function scheduleText(stop, cups, byCup){
+    var out = ["🎾 *" + stop.name.toUpperCase() + " SCHEDULE* 🎾"];
+    var info = [fmtDate(stop.date), stop.time, stop.venue].filter(Boolean).join(" · ");
+    if (info) out.push(info);
+    cups.forEach(function(c){
+      out.push("", "*" + c + "*");
+      var last = null;
+      byCup[c].forEach(function(m){
+        if (m.round !== last){
+          last = m.round;
+          var rest = resting(byCup[c], m.round);
+          out.push("*R" + m.round + (m.time ? " " + m.time : "") + "*" + (rest.length ? "  (rest: " + rest.map(nameOf).join(", ") + ")" : ""));
+        }
+        out.push("C" + (m.court || "?") + "  " + pairName(m.a) + " v " + pairName(m.b));
+      });
+    });
+    return out.join("\n");
+  }
+
+  function renderRules(main){
+    var stops = sortedStops(), stop = stops[stops.length - 1];
+    if (stop){
+      var ev = el("div",{cls:"event"},[el("h2",{text:stop.name})]);
+      [fmtDate(stop.date), stop.time, stop.venue].filter(Boolean).forEach(function(t){ ev.appendChild(el("div",{text:t})); });
+      main.appendChild(ev);
+    }
+    var rules = S.rules || DEFAULT_RULES;
+    var ol = el("ol",{cls:"rules"});
+    rules.forEach(function(r){ ol.appendChild(el("li",null,[el("span",{text:r})])); });
+    main.appendChild(ol);
+    var sh = el("button",{cls:"btn primary wide", text:"Share rules", onclick:function(){
+      openShare(["📋 *MALAYSIANO WEEKLY CHALLENGE RULES* 📋", ""].concat(rules.map(function(r,i){ return (i+1) + ". " + r; })).join("\n"));
+    }});
+    sh.style.marginTop = "16px"; main.appendChild(sh);
   }
 
   function stopText(stop, cups, byCup){
@@ -644,11 +711,13 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
     var card = el("div",{cls:"card"},[el("h3",{text:"New tour stop"})]);
     var nm = el("input",{type:"text", value:"Tour Stop " + n});
     var dt = el("input",{type:"date", value:new Date().toISOString().slice(0,10)});
+    var tm = el("input",{type:"text", placeholder:"e.g. 8:45am – 12:00pm"});
     var vn = el("input",{type:"text", placeholder:"e.g. Padel In Ar Rabwah"});
     var tot = el("input",{type:"text", inputmode:"numeric", placeholder:"e.g. 21, or leave empty"});
     var msg = el("div",{cls:"msg"});
     card.appendChild(el("div",{cls:"field"},[el("label",{text:"Name"}), nm]));
     card.appendChild(el("div",{cls:"field"},[el("label",{text:"Date"}), dt]));
+    card.appendChild(el("div",{cls:"field"},[el("label",{text:"Time"}), tm]));
     card.appendChild(el("div",{cls:"field"},[el("label",{text:"Venue"}), vn]));
     card.appendChild(el("div",{cls:"field"},[el("label",{text:"Total points per game, if fixed"}), tot]));
     card.appendChild(el("p",{cls:"note", text:"If games are played to a fixed total (like 21), the second score fills in by itself. Ratings work with any format."}));
@@ -656,7 +725,7 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
     var btn = el("button",{cls:"btn primary wide", text:"Create stop", onclick:function(){
       if (!nm.value.trim()) { msg.textContent = "Give the stop a name."; return; }
       btn.disabled = true; btn.textContent = "Creating…";
-      adminPost({action:"addStop", name:nm.value, date:dt.value, venue:vn.value, total:tot.value}).then(function(res){
+      adminPost({action:"addStop", name:nm.value, date:dt.value, time:tm.value, venue:vn.value, total:tot.value}).then(function(res){
         btn.disabled = false; btn.textContent = "Create stop";
         if (res.ok){ UI.stop = res.id; if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); load(); }
         else msg.textContent = res.error;
