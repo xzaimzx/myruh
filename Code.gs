@@ -27,7 +27,7 @@ var DEFAULT_RULES = [
   'When your court finishes, start the next round straight away.',
   'Back-to-back games stay on the same court.',
   'Injured or tired? A resting player fills in.',
-  'At 10–10, if there's a lady in the match, men can't serve to her.',
+  "At 10–10, if there's a lady in the match, men can't serve to her.",
   'Highest points wins each cup. Top 3 in each cup get gold, silver and bronze medals.'
 ];
 
@@ -110,6 +110,21 @@ function setup() {
     });
     matches.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
   }
+}
+
+// Run once from the Apps Script editor to give players their full display names.
+// Matches by id, so every score stays linked to the right person.
+function updateNames() {
+  var names = {
+    omar: 'Omar H', miza: 'Amiza', faisal: 'Faisal J', ain: 'NF Ain', zaim: 'Zaim Z', farah: 'Farah AN',
+    shazwan: 'Shazwan AR', fakhri: 'Fakri G', qayyum: 'Qayyum Z', amir: 'Amir AJ', derek: 'Derek P',
+    du: 'Du', amirul: 'Amirul I'
+  };
+  var sh = sheet('Players'), n = sh.getLastRow() - 1;
+  if (n < 1) return;
+  var range = sh.getRange(2, 1, n, 2), vals = range.getValues();
+  vals.forEach(function (r) { if (names[String(r[0])]) r[1] = names[String(r[0])]; });
+  range.setValues(vals);
 }
 
 /* ------------------------------------------------------------------ */
