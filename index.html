@@ -56,7 +56,7 @@ header.top .stripe2{position:absolute;right:120px;top:0;bottom:0;width:14px;back
 @media (max-width:350px){header.top h1{font-size:34px}.stars{width:170px;height:130px}.stars .du{height:130px}.stars .omar{height:110px}}
 
 nav.tabs{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;gap:5px;padding:calc(12px + env(safe-area-inset-top,0px)) 0 10px;margin-top:calc(-1 * env(safe-area-inset-top,0px));border-bottom:1px solid var(--line)}
-nav.tabs button{flex:1;min-width:0;border:1.5px solid var(--line);background:var(--surface);font-weight:600;font-size:15px;padding:9px 2px;border-radius:999px;cursor:pointer;white-space:nowrap}
+nav.tabs button{flex:1;min-width:0;border:1.5px solid var(--line);background:var(--surface);font-weight:600;font-size:14.5px;line-height:1.15;padding:8px 4px;border-radius:999px;cursor:pointer;white-space:nowrap}
 nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 :focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 
@@ -141,6 +141,9 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
 .sheet p{margin:0 0 12px;font-size:14.5px;color:var(--muted)}
 .sheet textarea{width:100%;height:46vh;height:46dvh;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:16px/1.45 "Barlow",system-ui,sans-serif;padding:10px;resize:none;-webkit-user-select:text;user-select:text}
 .rest{font-weight:500;color:var(--muted)}
+details.how summary{cursor:pointer;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:21px;list-style-position:inside}
+details.how p{margin:10px 0 0;font-size:15px}
+details.how .rules li{font-size:15.5px}
 .event .evmeta{font-family:"Barlow",sans-serif;font-size:13.5px;font-weight:500;opacity:.8;margin-top:6px}
 .lineup{padding:6px 0;font-size:15px}.lineup + .lineup{border-top:1px solid var(--line)}
 .lineup b{font-family:"Barlow Condensed",sans-serif;font-size:17px}
@@ -150,7 +153,7 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
 .event{background:var(--brand);color:#fff;border-radius:14px;padding:14px 16px;margin:14px 0}
 .event h2{margin:0 0 6px;font-family:Anton,sans-serif;font-weight:400;font-size:26px;color:var(--gold)}
 .event div{font-family:"Barlow Condensed",sans-serif;font-size:18px;font-weight:600}
-@media (max-width:350px){nav.tabs button{font-size:14px}}
+@media (max-width:380px){nav.tabs button{font-size:13.5px;white-space:normal;padding:6px 4px}}
 [hidden]{display:none!important}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -161,7 +164,7 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
   <div class="inner">
     <div class="title">
       <h1>Malaysiano Tour</h1>
-      <p>Season 1 rankings, every session counts</p>
+      <p>Season 2026/2027 · every Tour Stop counts</p>
     </div>
     <div class="stars" aria-hidden="true">
       <img class="omar" src="img/omar.webp" alt="">
@@ -171,10 +174,9 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
 </header>
 <div class="wrap">
   <nav class="tabs" role="tablist">
-    <button role="tab" data-tab="session" aria-selected="true">Session</button>
-    <button role="tab" data-tab="tour" aria-selected="false">Tour</button>
-    <button role="tab" data-tab="past" aria-selected="false">Past</button>
-    <button role="tab" data-tab="rules" aria-selected="false">Rules</button>
+    <button role="tab" data-tab="session" aria-selected="true" id="curTab">Tour Stop</button>
+    <button role="tab" data-tab="tour" aria-selected="false">Tour Rankings</button>
+    <button role="tab" data-tab="past" aria-selected="false">Past Tour Stops</button>
   </nav>
   <main id="main"></main>
   <div class="org" id="org"></div>
@@ -213,7 +215,7 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
 <div class="sheet" id="adminSheet" role="dialog" aria-modal="true" aria-labelledby="adminTitle">
   <div class="panel">
     <h3 id="adminTitle">Organiser tools</h3>
-    <p>Enter the Admin PIN to add players, sessions and matches, or delete matches.</p>
+    <p>Enter the Admin PIN to add players, Tour Stops and matches, or delete matches.</p>
     <div class="field"><label for="adminPin">Admin PIN</label><input id="adminPin" type="password" inputmode="numeric" autocomplete="off" maxlength="12"></div>
     <div class="msg" id="adminMsg"></div>
     <div class="actions">
@@ -247,7 +249,7 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
   function ssGet(k){ try { return sessionStorage.getItem(k); } catch(e){ return null; } }
   function ssSet(k, v){ try { if (v === null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch(e){} }
   UI.tab = lsGet("mt-tab") || "session";
-  if (["session","tour","past","rules"].indexOf(UI.tab) < 0) UI.tab = "session";
+  if (["session","tour","past"].indexOf(UI.tab) < 0) UI.tab = "session";
   try { var w = JSON.parse(lsGet("mt-who") || "null"); if (w && w.name) who = w; } catch(e){}
   adminPin = ssGet("mt-admin") || "";
 
@@ -389,6 +391,7 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
     var a = document.activeElement;
     if (a && a.closest && a.closest("#main") && (a.tagName === "INPUT" || a.tagName === "SELECT")) { UI.pendingRender = true; return; }
     UI.pendingRender = false;
+    var cs = currentStop(); document.getElementById("curTab").textContent = cs ? cs.name : "Tour Stop";
     document.querySelectorAll("nav.tabs button").forEach(function(b){ b.setAttribute("aria-selected", b.dataset.tab === UI.tab ? "true" : "false"); });
     var main = document.getElementById("main"); main.innerHTML = "";
     renderOrg();
@@ -407,7 +410,6 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
     if (S.error) main.appendChild(el("div",{cls:"status bad", text:S.error}));
     if (UI.tab === "tour"){ renderRank(main); renderPlayers(main); }
     else if (UI.tab === "past") renderPast(main);
-    else if (UI.tab === "rules") renderRules(main);
     else renderSession(main);
   }
 
@@ -432,7 +434,7 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
     main.appendChild(seg);
     var rows = boardRows(C, UI.board);
     var nstops = sortedStops().filter(function(s){ return stopMatches(s.id).some(scored); }).length;
-    main.appendChild(el("p",{cls:"note", text: C.played ? ("Season-long Malaysiano Tour ranking across every session. Ratings start at 1000 and move after every game, based on the result, the score margin and how strong the opponents were. " + nstops + (nstops === 1 ? " session" : " sessions") + " played so far.") : "Rankings appear once the first scores are in."}));
+    main.appendChild(el("p",{cls:"note", text: C.played ? ("Season 2026/2027 ranking across every Tour Stop. " + nstops + (nstops === 1 ? " Tour Stop" : " Tour Stops") + " played so far.") : "Rankings appear once the first scores are in."}));
     if (UI.board === "D"){
       var tg = el("button",{cls:"btn ghost", text: UI.allPairs ? "Show regular pairs only" : "Show all pairs, including one-off pairings", onclick:function(){ UI.allPairs = !UI.allPairs; render(); }});
       tg.style.cssText = "width:100%;margin-bottom:6px;font-size:14px;padding:9px";
@@ -456,10 +458,29 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
       ]));
     });
     main.appendChild(ul);
+    main.appendChild(howItWorks());
     if (C.played){
       var sh = el("button",{cls:"btn primary wide", text:"Share rankings", onclick:function(){ openShare(rankText(C)); }});
       sh.style.marginTop = "16px"; main.appendChild(sh);
     }
+  }
+
+  function howItWorks(){
+    var det = el("details",{cls:"card how"});
+    det.appendChild(el("summary",{text:"How the rankings are calculated"}));
+    [
+      "Everyone starts the season at 1,000 points.",
+      "After every game, each player's rating goes up or down. Your team's strength is the average rating of you and your partner.",
+      "Before the game, the ratings predict how well your team should do against the other pair. Beat that prediction and you gain points; fall short and you lose some.",
+      "What counts is half the result (win or lose) and half your share of the points (12–9 means you won 57% of the points). A close loss still earns credit, and a big win earns more.",
+      "Beating a stronger pair earns more than beating a weaker one. Losing to a stronger pair costs less.",
+      "Ratings move faster in your first 10 games (up to 32 points per game), then settle (up to 20 per game).",
+      "Missing a Tour Stop doesn't cost you anything. Your rating just waits for you.",
+      "Men and Women are shown on separate boards but share one rating pool, so mixed games count fully.",
+      "Doubles ranks each pair with its own rating, shown once a pair has played 2 games together.",
+      "Cup medals (🥇🥈🥉) come from each Tour Stop's cup points and are shown next to your name."
+    ].forEach(function(t){ det.appendChild(el("p",{text:t})); });
+    return det;
   }
 
   function rankText(C){
@@ -485,21 +506,21 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
       return;
     }
     var stop = currentStop();
-    if (!stop){ main.appendChild(el("div",{cls:"empty", text: isAdmin() ? "Start the first session to begin." : "No session yet."})); }
+    if (!stop){ main.appendChild(el("div",{cls:"empty", text: isAdmin() ? "Start the first Tour Stop to begin." : "No Tour Stop yet."})); }
     else renderStopBody(main, stop);
     if (isAdmin()){
-      var nb = el("button",{cls:"btn ghost wide", text:"+ Start a new session", onclick:function(){ UI.newStop = true; render(); window.scrollTo(0,0); }});
+      var nb = el("button",{cls:"btn ghost wide", text:"+ Start Tour Stop " + (sortedStops().length + 1), onclick:function(){ UI.newStop = true; render(); window.scrollTo(0,0); }});
       nb.style.marginTop = "12px"; main.appendChild(nb);
-      main.appendChild(el("p",{cls:"note", text:"Starting a new session moves this one to Past."}));
+      main.appendChild(el("p",{cls:"note", text:"Starting the next Tour Stop moves this one to Past Tour Stops."}));
     }
   }
 
   function renderPast(main){
     var cur = currentStop();
     var past = sortedStops().filter(function(s){ return !cur || s.id !== cur.id; }).reverse();
-    if (!past.length){ main.appendChild(el("div",{cls:"empty", text:"No past sessions yet. After this week, its results will be kept here."})); return; }
+    if (!past.length){ main.appendChild(el("div",{cls:"empty", text:"No past Tour Stops yet. Once the next Tour Stop starts, this one's results will be kept here."})); return; }
     if (!UI.stop || !past.some(function(s){ return s.id === UI.stop; })) UI.stop = past[0].id;
-    var chips = el("div",{cls:"chips", role:"group", "aria-label":"Past sessions"});
+    var chips = el("div",{cls:"chips", role:"group", "aria-label":"Past Tour Stops"});
     past.forEach(function(s){ chips.appendChild(el("button",{text:s.name, "aria-pressed": UI.stop === s.id ? "true" : "false", onclick:function(){ UI.stop = s.id; render(); }})); });
     main.appendChild(chips);
     renderStopBody(main, S.stops[UI.stop]);
@@ -525,7 +546,7 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
     ms.forEach(function(m){ var c = m.cup || "Cup"; if (!byCup[c]){ byCup[c] = []; cups.push(c); } byCup[c].push(m); });
     if (!ms.length) main.appendChild(el("div",{cls:"empty", text: isAdmin() ? "No matches yet. Add them below." : "No matches yet."}));
     if (cups.length){
-      var lu = el("div",{cls:"card"},[el("h3",{text:"Players this session"})]);
+      var lu = el("div",{cls:"card"},[el("h3",{text:"Players at this Tour Stop"})]);
       cups.forEach(function(c){
         var ids = {}; byCup[c].forEach(function(m){ m.a.concat(m.b).forEach(function(id){ ids[id] = 1; }); });
         var names = Object.keys(ids).map(nameOf).sort(function(x,y){ return x.localeCompare(y); });
@@ -533,6 +554,8 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
       });
       main.appendChild(lu);
     }
+    var cur = currentStop();
+    if (cur && cur.id === stop.id) main.appendChild(rulesCard());
     cups.forEach(function(c){
       var list = byCup[c];
       main.appendChild(el("div",{cls:"cup"},[el("h3",{text:c}), el("span",{text: list.filter(scored).length + "/" + list.length + " scored"})]));
@@ -590,21 +613,17 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
     return out.join("\n");
   }
 
-  function renderRules(main){
-    var stops = sortedStops(), stop = stops[stops.length - 1];
-    if (stop){
-      var ev = el("div",{cls:"event"},[el("h2",{text:stop.name})]);
-      [fmtDate(stop.date), stop.time, stop.venue].filter(Boolean).forEach(function(t){ ev.appendChild(el("div",{text:t})); });
-      main.appendChild(ev);
-    }
+  function rulesCard(){
     var rules = S.rules || DEFAULT_RULES;
+    var card = el("details",{cls:"card how", open:"open"});
+    card.appendChild(el("summary",{text:"Rules"}));
     var ol = el("ol",{cls:"rules"});
     rules.forEach(function(r){ ol.appendChild(el("li",null,[el("span",{text:r})])); });
-    main.appendChild(ol);
-    var sh = el("button",{cls:"btn primary wide", text:"Share rules", onclick:function(){
+    card.appendChild(ol);
+    card.appendChild(el("button",{cls:"btn ghost wide", text:"Share rules", style:"margin-top:12px", onclick:function(){
       openShare(["📋 *MALAYSIANO WEEKLY CHALLENGE RULES* 📋", ""].concat(rules.map(function(r,i){ return (i+1) + ". " + r; })).join("\n"));
-    }});
-    sh.style.marginTop = "16px"; main.appendChild(sh);
+    }}));
+    return card;
   }
 
   function stopText(stop, cups, byCup){
@@ -740,7 +759,7 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
   }
 
   function newStopForm(n){
-    var card = el("div",{cls:"card"},[el("h3",{text:"Start a new session"})]);
+    var card = el("div",{cls:"card"},[el("h3",{text:"Start the next Tour Stop"})]);
     var nm = el("input",{type:"text", value:"Tour Stop " + n});
     var dt = el("input",{type:"date", value:new Date().toISOString().slice(0,10)});
     var tm = el("input",{type:"text", placeholder:"e.g. 8:45am – 12:00pm"});
@@ -754,11 +773,11 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
     card.appendChild(el("div",{cls:"field"},[el("label",{text:"Total points per game, if fixed"}), tot]));
     card.appendChild(el("p",{cls:"note", text:"If games are played to a fixed total (like 21), the second score fills in by itself. Ratings work with any format."}));
     card.appendChild(msg);
-    var btn = el("button",{cls:"btn primary wide", text:"Create session", onclick:function(){
-      if (!nm.value.trim()) { msg.textContent = "Give the session a name."; return; }
+    var btn = el("button",{cls:"btn primary wide", text:"Create Tour Stop", onclick:function(){
+      if (!nm.value.trim()) { msg.textContent = "Give the Tour Stop a name."; return; }
       btn.disabled = true; btn.textContent = "Creating…";
       adminPost({action:"addStop", name:nm.value, date:dt.value, time:tm.value, venue:vn.value, total:tot.value}).then(function(res){
-        btn.disabled = false; btn.textContent = "Create session";
+        btn.disabled = false; btn.textContent = "Create Tour Stop";
         if (res.ok){ UI.newStop = false; UI.tab = "session"; if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); load(); }
         else msg.textContent = res.error;
       });
@@ -795,7 +814,7 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
     var ul = el("ul",{cls:"plist"});
     ps.forEach(function(p){
       var x = C.st[p.id];
-      ul.appendChild(el("li",null,[el("div",null,[el("b",{text:p.name}), document.createTextNode("  "), el("span",{text: p.gender === "F" ? "Women" : "Men"})]), el("span",{text: x ? (x.games + (x.games === 1 ? " game, " : " games, ") + Object.keys(x.stops).length + (Object.keys(x.stops).length === 1 ? " session" : " sessions")) : "Not played yet"})]));
+      ul.appendChild(el("li",null,[el("div",null,[el("b",{text:p.name}), document.createTextNode("  "), el("span",{text: p.gender === "F" ? "Women" : "Men"})]), el("span",{text: x ? (x.games + (x.games === 1 ? " game, " : " games, ") + Object.keys(x.stops).length + (Object.keys(x.stops).length === 1 ? " Tour Stop" : " Tour Stops")) : "Not played yet"})]));
     });
     main.appendChild(ul);
   }
