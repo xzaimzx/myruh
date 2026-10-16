@@ -27,7 +27,7 @@ var DEFAULT_RULES = [
   'When your court finishes, start the next round straight away.',
   'Back-to-back games stay on the same court.',
   'Injured or tired? A resting player fills in.',
-  'Mixed doubles: if the score is tied at 10–10 for the winning point, men may not serve to ladies.',
+  'At 10–10, if there's a lady in the match, men can't serve to her.',
   'Highest points wins each cup. Top 3 in each cup get gold, silver and bronze medals.'
 ];
 
