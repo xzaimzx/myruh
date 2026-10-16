@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0A1A3F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Malaysiano">
+<meta name="format-detection" content="telephone=no">
+<title>Malaysiano Tour</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230A1A3F'/%3E%3Ccircle cx='32' cy='32' r='17' fill='%23FFCC00'/%3E%3Cpath d='M18 26c9 4 19 4 28 0M18 38c9-4 19-4 28 0' stroke='%230A1A3F' stroke-width='3' fill='none'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230A1A3F'/%3E%3Ccircle cx='32' cy='32' r='17' fill='%23FFCC00'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<script>
+  /* ====== The only line you need to change: paste your Apps Script Web app URL between the quotes. ====== */
+  const API_URL = "PASTE_YOUR_WEB_APP_URL_HERE";
+</script>
+<style>
+:root{
+  --bg:#F2F4F9; --surface:#FFFFFF; --ink:#0A1A3F; --muted:#56617A; --line:#D8DEEA;
+  --brand:#0A1A3F; --brand-ink:#FFFFFF; --gold:#FFCC00; --red:#C8102E; --pos:#1C7A3C; --neg:#C8102E;
+  --chip:#E7EBF4;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#06102A; --surface:#0E1C42; --ink:#EDF1FA; --muted:#9CA9C5; --line:#22345F;
+    --brand:#0A1A3F; --brand-ink:#FFFFFF; --gold:#FFCC00; --red:#FF6E7C; --pos:#62D48C; --neg:#FF7B86;
+    --chip:#182A57;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#06102A; --surface:#0E1C42; --ink:#EDF1FA; --muted:#9CA9C5; --line:#22345F;
+  --brand:#0A1A3F; --brand-ink:#FFFFFF; --gold:#FFCC00; --red:#FF6E7C; --pos:#62D48C; --neg:#FF7B86;
+  --chip:#182A57;
+}
+*,*::before,*::after{box-sizing:border-box}
+button,input,select{-webkit-appearance:none;appearance:none;touch-action:manipulation;font:inherit;color:inherit}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 60px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;padding-bottom:env(safe-area-inset-bottom,0px)}
+.wrap{max-width:620px;margin:0 auto;padding:0 14px 48px}
+
+header.top{background:var(--brand);color:var(--brand-ink);padding:calc(20px + env(safe-area-inset-top,0px)) 18px 18px;position:relative;overflow:hidden}
+header.top .inner{max-width:620px;margin:0 auto;position:relative;z-index:1}
+header.top h1{margin:0;font-family:Anton,"Barlow Condensed",sans-serif;font-weight:400;font-size:44px;line-height:.95;color:var(--gold);letter-spacing:.5px}
+header.top p{margin:6px 0 0;font-family:"Barlow Condensed",sans-serif;font-size:18px;font-weight:600;opacity:.92}
+header.top .stripe{position:absolute;right:-40px;top:0;bottom:0;width:150px;background:var(--red);transform:skewX(-14deg);opacity:.95}
+header.top .stripe2{position:absolute;right:120px;top:0;bottom:0;width:14px;background:var(--gold);transform:skewX(-14deg)}
+
+nav.tabs{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;gap:6px;padding:calc(12px + env(safe-area-inset-top,0px)) 0 10px;margin-top:calc(-1 * env(safe-area-inset-top,0px));border-bottom:1px solid var(--line)}
+nav.tabs button{flex:1;border:1.5px solid var(--line);background:var(--surface);font-weight:600;font-size:15px;padding:9px 4px;border-radius:999px;cursor:pointer;white-space:nowrap}
+nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+
+.seg{display:flex;background:var(--chip);border-radius:12px;padding:4px;gap:4px;margin:14px 0 6px}
+.seg button{flex:1;border:0;background:transparent;padding:8px 6px;border-radius:9px;font-weight:600;font-size:15px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.note{font-size:14px;color:var(--muted);margin:6px 2px 10px}
+
+.board{list-style:none;margin:0;padding:0}
+.row{display:grid;grid-template-columns:44px 1fr auto;align-items:center;gap:10px;padding:12px 6px 12px 2px;border-bottom:1px solid var(--line)}
+.row .rk{font-family:Anton,sans-serif;font-size:28px;line-height:1;text-align:center;color:var(--muted)}
+.row.top1 .rk{color:var(--ink)}
+.row.top1 .rk span{background:var(--gold);color:#0A1A3F;display:inline-block;min-width:38px;padding:4px 0 2px;border-radius:6px}
+.row .nm{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:21px;line-height:1.1}
+.row .sub{font-size:13.5px;color:var(--muted);margin-top:2px}
+.row .medals{font-size:13px;margin-left:4px;letter-spacing:1px}
+.row .rt{text-align:right}
+.row .rt b{font-family:Anton,sans-serif;font-weight:400;font-size:28px;line-height:1;display:block}
+.row .rt small{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+.up{color:var(--pos)} .down{color:var(--neg)} .flat{color:var(--muted)}
+.empty{padding:28px 6px;color:var(--muted);text-align:center}
+
+.chips{display:flex;gap:8px;overflow-x:auto;padding:14px 0 6px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chips button{flex:none;border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 14px;font-weight:600;font-size:14px;cursor:pointer;white-space:nowrap}
+.chips button[aria-pressed="true"]{border-color:var(--ink);background:var(--ink);color:var(--bg)}
+.stophead{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;margin:8px 2px 4px}
+.stophead h2{margin:0;font-family:Anton,sans-serif;font-weight:400;font-size:28px;line-height:1.05}
+.stophead .meta{font-size:14px;color:var(--muted)}
+.cup{margin:18px 0 6px;display:flex;align-items:baseline;justify-content:space-between;gap:8px;border-top:3px solid var(--red);padding-top:8px}
+.cup h3{margin:0;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:22px}
+.cup span{font-size:13px;color:var(--muted)}
+.rnd{font-size:13px;font-weight:600;color:var(--muted);margin:12px 2px 6px}
+.match{background:var(--surface);border:1px solid var(--line);border-radius:12px;display:grid;grid-template-columns:30px 1fr;overflow:hidden;margin-bottom:6px}
+.match .ct{background:var(--brand);color:var(--gold);font-family:Anton,sans-serif;font-size:15px;display:flex;align-items:center;justify-content:center}
+.side{display:flex;align-items:center;gap:10px;padding:7px 8px 7px 12px}
+.side + .side{border-top:1px dashed var(--line)}
+.side .who{flex:1;font-weight:500;min-width:0}
+.side.won{background:color-mix(in srgb, var(--gold) 22%, var(--surface))}
+.side.won .who{font-weight:700}
+.sc{width:56px;height:40px;border:1.5px solid var(--line);border-radius:9px;background:var(--bg);text-align:center;font-family:Anton,sans-serif;font-size:22px}
+.mfoot{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid var(--line);padding:0 0 0 10px;min-height:30px}
+.mfoot .by{font-size:12.5px;color:var(--muted)}
+.mfoot .by.err{color:var(--red)}
+.del{border:0;background:transparent;color:var(--muted);font-size:13px;padding:6px 8px;cursor:pointer}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin:14px 0}
+.card h3{margin:0 0 10px;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:21px}
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.field label{font-size:13.5px;font-weight:600;color:var(--muted)}
+.field input,.field select{border:1.5px solid var(--line);border-radius:10px;background:var(--bg);padding:10px 12px;font-size:16px;width:100%}
+.field select{background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 18px) 55%,calc(100% - 13px) 55%;background-size:5px 5px;background-repeat:no-repeat;padding-right:32px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.btn{border:0;border-radius:12px;padding:12px 14px;font-weight:600;font-size:15px;cursor:pointer}
+.btn.primary{background:var(--ink);color:var(--bg)}
+.btn.ghost{background:transparent;border:1.5px solid var(--line)}
+.btn.wide{width:100%}
+.btn:disabled{opacity:.55}
+.actions{display:flex;gap:8px;margin-top:14px}
+.actions .btn{flex:1}
+.msg{font-size:14px;color:var(--red);min-height:20px;margin-top:6px}
+.plist{list-style:none;margin:0;padding:0}
+.plist li{display:flex;justify-content:space-between;padding:11px 4px;border-bottom:1px solid var(--line)}
+.plist li span{color:var(--muted);font-size:14px}
+.standings{width:100%;border-collapse:collapse;font-size:15px}
+.standings td{padding:7px 4px;border-bottom:1px solid var(--line)}
+.standings td:last-child{text-align:right;font-family:Anton,sans-serif;font-size:18px}
+.standings td:first-child{width:30px;color:var(--muted);font-weight:600}
+.status{margin:14px 0;padding:12px 14px;border-radius:12px;background:var(--chip);font-size:14px}
+.status.bad{border-left:4px solid var(--red)}
+.org{margin-top:28px;border-top:1px solid var(--line);padding-top:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:14px;color:var(--muted)}
+.org .btn{padding:8px 12px;font-size:14px}
+.who-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13.5px;color:var(--muted);margin:10px 2px 0}
+.linkbtn{border:0;background:transparent;color:var(--ink);text-decoration:underline;font-size:13.5px;cursor:pointer;padding:4px}
+.updated{font-size:12.5px;color:var(--muted);text-align:center;margin-top:18px}
+
+.sheet{position:fixed;inset:0;background:rgba(3,8,22,.6);display:none;align-items:flex-end;justify-content:center;z-index:20}
+.sheet.open{display:flex}
+.sheet .panel{background:var(--surface);width:100%;max-width:620px;border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px))}
+.sheet h3{margin:0 0 8px;font-family:"Barlow Condensed",sans-serif;font-size:22px}
+.sheet p{margin:0 0 12px;font-size:14.5px;color:var(--muted)}
+.sheet textarea{width:100%;height:46vh;height:46dvh;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:16px/1.45 "Barlow",system-ui,sans-serif;padding:10px;resize:none;-webkit-user-select:text;user-select:text}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="stripe" aria-hidden="true"></div><div class="stripe2" aria-hidden="true"></div>
+  <div class="inner">
+    <h1>Malaysiano Tour</h1>
+    <p>Season 1 rankings, every stop counts</p>
+  </div>
+</header>
+<div class="wrap">
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="rank" aria-selected="true">Rankings</button>
+    <button role="tab" data-tab="stops" aria-selected="false">Tour stops</button>
+    <button role="tab" data-tab="players" aria-selected="false">Players</button>
+  </nav>
+  <main id="main"></main>
+  <div class="org" id="org"></div>
+  <div class="updated" id="updated"></div>
+</div>
+
+<!-- Share to WhatsApp -->
+<div class="sheet" id="shareSheet" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
+  <div class="panel">
+    <h3 id="shareTitle">Share to WhatsApp</h3>
+    <textarea id="shareText" readonly></textarea>
+    <div class="msg" id="shareToast" style="color:var(--muted)"></div>
+    <div class="actions">
+      <button class="btn primary" id="copyBtn">Copy text</button>
+      <button class="btn ghost" data-close>Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Name + Score PIN -->
+<div class="sheet" id="whoSheet" role="dialog" aria-modal="true" aria-labelledby="whoTitle">
+  <div class="panel">
+    <h3 id="whoTitle">Who's entering scores?</h3>
+    <p>Your name is saved with every score you enter. Ask the organiser for this week's Score PIN.</p>
+    <div class="field"><label for="whoName">Your name</label><input id="whoName" type="text" autocomplete="name" maxlength="40"></div>
+    <div class="field"><label for="whoPin">Score PIN</label><input id="whoPin" type="text" inputmode="numeric" autocomplete="off" maxlength="12"></div>
+    <div class="msg" id="whoMsg"></div>
+    <div class="actions">
+      <button class="btn primary" id="whoSave">Save and continue</button>
+      <button class="btn ghost" data-close>Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Admin PIN -->
+<div class="sheet" id="adminSheet" role="dialog" aria-modal="true" aria-labelledby="adminTitle">
+  <div class="panel">
+    <h3 id="adminTitle">Organiser tools</h3>
+    <p>Enter the Admin PIN to add players, tour stops and matches, or delete matches.</p>
+    <div class="field"><label for="adminPin">Admin PIN</label><input id="adminPin" type="password" inputmode="numeric" autocomplete="off" maxlength="12"></div>
+    <div class="msg" id="adminMsg"></div>
+    <div class="actions">
+      <button class="btn primary" id="adminSave">Unlock</button>
+      <button class="btn ghost" data-close>Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var S = {players:{}, stops:{}, matches:{}, state:"loading", error:"", loadedAt:null};
+  var UI = {tab:"rank", board:"M", allPairs:false, stop:null, pendingRender:false};
+  var pending = {};          // matchId -> {sa, sb} not yet confirmed by the sheet
+  var status = {};           // matchId -> "Saving…" / error text
+  var who = {name:"", pin:""};
+  var adminPin = "";
+
+  function lsGet(k){ try { return localStorage.getItem(k); } catch(e){ return null; } }
+  function lsSet(k, v){ try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch(e){} }
+  function ssGet(k){ try { return sessionStorage.getItem(k); } catch(e){ return null; } }
+  function ssSet(k, v){ try { if (v === null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch(e){} }
+  UI.tab = lsGet("mt-tab") || "rank";
+  try { var w = JSON.parse(lsGet("mt-who") || "null"); if (w && w.name) who = w; } catch(e){}
+  adminPin = ssGet("mt-admin") || "";
+
+  var configured = typeof API_URL === "string" && /^https:\/\/script\.google(usercontent)?\.com\//.test(API_URL.trim());
+
+  /* ---------- Helpers ---------- */
+  function el(tag, attrs, kids){
+    var e = document.createElement(tag);
+    if (attrs) for (var k in attrs){
+      if (k === "text") e.textContent = attrs[k];
+      else if (k === "cls") e.className = attrs[k];
+      else if (k.slice(0,2) === "on") e.addEventListener(k.slice(2), attrs[k]);
+      else if (attrs[k] !== null && attrs[k] !== undefined && attrs[k] !== false) e.setAttribute(k, attrs[k]);
+    }
+    (kids || []).forEach(function(c){ if (c) e.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
+    return e;
+  }
+  function nameOf(id){ var p = S.players[id]; return p ? p.name : "?"; }
+  function pairName(ids){ return ids.map(nameOf).join(" / "); }
+  function scored(m){ return typeof m.sa === "number" && typeof m.sb === "number" && (m.sa + m.sb) > 0; }
+  function fmtDate(d){ if (!d) return ""; var x = new Date(d + "T00:00:00"); if (isNaN(x)) return d; return x.toLocaleDateString(undefined,{weekday:"short", day:"numeric", month:"short"}); }
+  function isAdmin(){ return !!adminPin; }
+
+  function sortedStops(){
+    return Object.keys(S.stops).map(function(k){ return S.stops[k]; })
+      .sort(function(a,b){ return (a.date||"").localeCompare(b.date||"") || (a.created||"").localeCompare(b.created||""); });
+  }
+  function stopMatches(stopId){
+    return Object.keys(S.matches).map(function(k){ return S.matches[k]; })
+      .filter(function(m){ return m.stop === stopId; })
+      .sort(function(a,b){ return (a.seq||0) - (b.seq||0); });
+  }
+
+  /* ---------- Talking to the Google Sheet ---------- */
+  function apply(data){
+    var P = {}, St = {}, M = {};
+    (data.players || []).forEach(function(p){ P[p.id] = p; });
+    (data.stops || []).forEach(function(s){ St[s.id] = s; });
+    (data.matches || []).forEach(function(m){
+      var p = pending[m.id];
+      if (p){ m.sa = p.sa; m.sb = p.sb; }
+      M[m.id] = m;
+    });
+    S.players = P; S.stops = St; S.matches = M;
+  }
+  function load(quiet){
+    if (!configured) return Promise.resolve();
+    return fetch(API_URL.trim() + "?t=" + Date.now(), {cache:"no-store"})
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        if (!data || !data.ok) throw new Error(data && data.error || "bad");
+        apply(data); S.state = "ready"; S.error = ""; S.loadedAt = new Date();
+        lsSet("mt-cache", JSON.stringify(data));
+        render();
+      })
+      .catch(function(){
+        if (S.state !== "ready") { S.state = "error"; render(); }
+        else if (!quiet) { S.error = "Couldn't reach the Google Sheet just now. Showing the last scores loaded."; render(); }
+      });
+  }
+  function post(body){
+    return fetch(API_URL.trim(), {method:"POST", body: JSON.stringify(body)})
+      .then(function(r){ return r.json(); })
+      .catch(function(){ return {ok:false, error:"Couldn't reach the Google Sheet. Check your connection and try again."}; });
+  }
+  function adminPost(body){
+    body.adminPin = adminPin;
+    return post(body).then(function(res){
+      if (res && res.badPin){ adminPin = ""; ssSet("mt-admin", null); render(); }
+      return res;
+    });
+  }
+
+  /* ---------- Ratings ---------- */
+  function compute(){
+    var stops = sortedStops();
+    var order = {}; stops.forEach(function(s,i){ order[s.id] = i; });
+    var all = Object.keys(S.matches).map(function(k){ return S.matches[k]; })
+      .filter(function(m){ return scored(m) && order[m.stop] !== undefined && S.players[m.a[0]] && S.players[m.a[1]] && S.players[m.b[0]] && S.players[m.b[1]]; })
+      .sort(function(x,y){ return order[x.stop] - order[y.stop] || (x.seq||0) - (y.seq||0); });
+    var R = {}, st = {}, PR = {}, ps = {}, before = null, beforeP = null;
+    var lastStop = all.length ? all[all.length-1].stop : null;
+    function r(id){ return R[id] === undefined ? 1000 : R[id]; }
+    function pr(k){ return PR[k] === undefined ? 1000 : PR[k]; }
+    function s(id){ return st[id] || (st[id] = {games:0,wins:0,losses:0,share:0,stops:{}}); }
+    function sp(k, ids){ return ps[k] || (ps[k] = {ids:ids, games:0, wins:0, losses:0, share:0}); }
+    all.forEach(function(m){
+      if (m.stop === lastStop && before === null){ before = JSON.parse(JSON.stringify(R)); beforeP = JSON.parse(JSON.stringify(PR)); }
+      var ra = (r(m.a[0]) + r(m.a[1])) / 2, rb = (r(m.b[0]) + r(m.b[1])) / 2;
+      var E = 1 / (1 + Math.pow(10, (rb - ra) / 400));
+      var share = m.sa / (m.sa + m.sb);
+      var win = m.sa > m.sb ? 1 : (m.sa < m.sb ? 0 : 0.5);
+      var A = 0.5 * win + 0.5 * share;
+      m.a.forEach(function(id){ var x = s(id); var K = x.games < 10 ? 32 : 20; R[id] = r(id) + K * (A - E); x.games++; if (win===1) x.wins++; else if (win===0) x.losses++; x.share += share; x.stops[m.stop]=1; });
+      m.b.forEach(function(id){ var x = s(id); var K = x.games < 10 ? 32 : 20; R[id] = r(id) + K * ((1-A) - (1-E)); x.games++; if (win===0) x.wins++; else if (win===1) x.losses++; x.share += 1 - share; x.stops[m.stop]=1; });
+      var ka = m.a.slice().sort().join("+"), kb = m.b.slice().sort().join("+");
+      var pa = pr(ka), pb = pr(kb), PE = 1 / (1 + Math.pow(10, (pb - pa) / 400));
+      var xa = sp(ka, m.a.slice().sort()), xb = sp(kb, m.b.slice().sort());
+      var KA = xa.games < 5 ? 32 : 20, KB = xb.games < 5 ? 32 : 20;
+      PR[ka] = pa + KA * (A - PE); PR[kb] = pb + KB * ((1-A) - (1-PE));
+      xa.games++; xb.games++; xa.share += share; xb.share += 1 - share;
+      if (win===1){ xa.wins++; xb.losses++; } else if (win===0){ xb.wins++; xa.losses++; }
+    });
+    var medals = {};
+    stops.forEach(function(stop){
+      var ms = stopMatches(stop.id); var cups = {};
+      ms.forEach(function(m){ (cups[m.cup||"Cup"] = cups[m.cup||"Cup"] || []).push(m); });
+      Object.keys(cups).forEach(function(c){
+        var list = cups[c]; if (!list.length || !list.every(scored)) return;
+        cupTable(list).slice(0,3).forEach(function(row,i){ var md = medals[row.id] || (medals[row.id] = [0,0,0]); md[i]++; });
+      });
+    });
+    return {R:R, st:st, PR:PR, ps:ps, before:before, beforeP:beforeP, lastStop:lastStop, medals:medals, played:all.length};
+  }
+  function cupTable(list){
+    var t = {};
+    list.forEach(function(m){ if (!scored(m)) return;
+      m.a.forEach(function(id){ var x = t[id] || (t[id] = {id:id, pts:0, w:0, g:0}); x.pts += m.sa; x.g++; if (m.sa > m.sb) x.w++; });
+      m.b.forEach(function(id){ var x = t[id] || (t[id] = {id:id, pts:0, w:0, g:0}); x.pts += m.sb; x.g++; if (m.sb > m.sa) x.w++; });
+    });
+    return Object.keys(t).map(function(k){ return t[k]; }).sort(function(a,b){ return b.pts - a.pts || b.w - a.w || nameOf(a.id).localeCompare(nameOf(b.id)); });
+  }
+  function medalStr(md){ if (!md) return ""; var s = ""; if (md[0]) s += "🥇" + (md[0] > 1 ? md[0] : ""); if (md[1]) s += " 🥈" + (md[1] > 1 ? md[1] : ""); if (md[2]) s += " 🥉" + (md[2] > 1 ? md[2] : ""); return s.trim(); }
+
+  function boardRows(C, kind){
+    if (kind === "D"){
+      return Object.keys(C.ps).map(function(k){ var x = C.ps[k]; return {key:k, name:pairName(x.ids), rating:C.PR[k], prev:C.beforeP ? C.beforeP[k] : undefined, x:x}; })
+        .filter(function(r){ return UI.allPairs || r.x.games >= 2; })
+        .sort(function(a,b){ return b.rating - a.rating; });
+    }
+    return Object.keys(C.st).filter(function(id){ return S.players[id] && S.players[id].gender === kind; })
+      .map(function(id){ return {key:id, name:nameOf(id), rating:C.R[id], prev:C.before ? C.before[id] : undefined, x:C.st[id], medals:C.medals[id], newbie: C.lastStop && Object.keys(C.st[id].stops).length === 1 && C.st[id].stops[C.lastStop]}; })
+      .sort(function(a,b){ return b.rating - a.rating; });
+  }
+
+  /* ---------- Render ---------- */
+  function render(){
+    var a = document.activeElement;
+    if (a && a.closest && a.closest("#main") && (a.tagName === "INPUT" || a.tagName === "SELECT")) { UI.pendingRender = true; return; }
+    UI.pendingRender = false;
+    document.querySelectorAll("nav.tabs button").forEach(function(b){ b.setAttribute("aria-selected", b.dataset.tab === UI.tab ? "true" : "false"); });
+    var main = document.getElementById("main"); main.innerHTML = "";
+    renderOrg();
+    var up = document.getElementById("updated");
+    up.textContent = S.loadedAt ? "Updated " + S.loadedAt.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"}) + ". Refreshes by itself every 20 seconds." : "";
+    if (!configured){
+      main.appendChild(el("div",{cls:"status bad", text:"This site isn't connected to the Google Sheet yet. The organiser needs to paste the Apps Script Web app URL into index.html."}));
+      return;
+    }
+    if (S.state === "loading"){ main.appendChild(el("div",{cls:"empty", text:"Loading the tour…"})); return; }
+    if (S.state === "error"){
+      main.appendChild(el("div",{cls:"status bad", text:"Couldn't load the tour data. Check your connection and try again."}));
+      main.appendChild(el("button",{cls:"btn primary wide", text:"Try again", onclick:function(){ S.state = "loading"; render(); load(); }}));
+      return;
+    }
+    if (S.error) main.appendChild(el("div",{cls:"status bad", text:S.error}));
+    if (UI.tab === "rank") renderRank(main);
+    else if (UI.tab === "stops") renderStops(main);
+    else renderPlayers(main);
+  }
+
+  function renderOrg(){
+    var org = document.getElementById("org"); org.innerHTML = "";
+    if (!configured || S.state !== "ready") return;
+    if (isAdmin()){
+      org.appendChild(el("span",{text:"Organiser tools are on"}));
+      org.appendChild(el("button",{cls:"btn ghost", text:"Lock", onclick:function(){ adminPin = ""; ssSet("mt-admin", null); render(); }}));
+    } else {
+      org.appendChild(el("span",{text:"Organiser?"}));
+      org.appendChild(el("button",{cls:"btn ghost", text:"Organiser tools", onclick:openAdmin}));
+    }
+  }
+
+  function renderRank(main){
+    var C = compute();
+    var seg = el("div",{cls:"seg", role:"group", "aria-label":"Ranking"});
+    [["M","Men"],["F","Women"],["D","Doubles"]].forEach(function(o){
+      seg.appendChild(el("button",{text:o[1], "aria-pressed": UI.board === o[0] ? "true" : "false", onclick:function(){ UI.board = o[0]; render(); }}));
+    });
+    main.appendChild(seg);
+    var rows = boardRows(C, UI.board);
+    var nstops = sortedStops().filter(function(s){ return stopMatches(s.id).some(scored); }).length;
+    main.appendChild(el("p",{cls:"note", text: C.played ? ("Ratings start at 1000 and move after every game, based on the result, the score margin and how strong the opponents were. " + nstops + (nstops === 1 ? " stop" : " stops") + " played so far.") : "Rankings appear once the first scores are in."}));
+    if (UI.board === "D"){
+      var tg = el("button",{cls:"btn ghost", text: UI.allPairs ? "Show regular pairs only" : "Show all pairs, including one-off pairings", onclick:function(){ UI.allPairs = !UI.allPairs; render(); }});
+      tg.style.cssText = "width:100%;margin-bottom:6px;font-size:14px;padding:9px";
+      main.appendChild(tg);
+    }
+    if (!rows.length && C.played){ main.appendChild(el("div",{cls:"empty", text: UI.board === "D" ? "No pair has played 2 games together yet." : "No ranked players yet."})); }
+    var ul = el("ol",{cls:"board"});
+    rows.forEach(function(r,i){
+      var d = r.prev === undefined ? null : Math.round(r.rating) - Math.round(r.prev);
+      var dEl;
+      if (r.newbie) dEl = el("small",{cls:"flat", text:"New"});
+      else if (d === null) dEl = el("small",{cls:"flat", text:""});
+      else dEl = el("small",{cls: d > 0 ? "up" : (d < 0 ? "down" : "flat"), text: d > 0 ? "▲ " + d : (d < 0 ? "▼ " + Math.abs(d) : "–")});
+      var x = r.x, pct = x.games ? Math.round(x.share / x.games * 100) : 0;
+      var nm = el("div",{cls:"nm"},[r.name]);
+      if (r.medals) nm.appendChild(el("span",{cls:"medals", text:" " + medalStr(r.medals)}));
+      ul.appendChild(el("li",{cls:"row" + (i === 0 ? " top1" : "")},[
+        el("div",{cls:"rk"},[el("span",{text:String(i+1)})]),
+        el("div",null,[nm, el("div",{cls:"sub", text: x.games + (x.games === 1 ? " game" : " games") + "  ·  " + x.wins + "–" + x.losses + "  ·  " + pct + "% of points won"})]),
+        el("div",{cls:"rt"},[el("b",{text:String(Math.round(r.rating))}), dEl])
+      ]));
+    });
+    main.appendChild(ul);
+    if (C.played){
+      var sh = el("button",{cls:"btn primary wide", text:"Share rankings", onclick:function(){ openShare(rankText(C)); }});
+      sh.style.marginTop = "16px"; main.appendChild(sh);
+    }
+  }
+
+  function rankText(C){
+    var out = ["🏆 *MALAYSIANO TOUR RANKINGS* 🏆", ""];
+    [["M","Men"],["F","Women"]].forEach(function(b){
+      var rows = boardRows(C, b[0]); if (!rows.length) return;
+      out.push("*" + b[1] + "*");
+      rows.forEach(function(r,i){ var d = r.prev === undefined ? "" : (function(){ var v = Math.round(r.rating) - Math.round(r.prev); return v > 0 ? " ▲" + v : (v < 0 ? " ▼" + Math.abs(v) : ""); })();
+        out.push((i+1) + ". " + r.name + " – " + Math.round(r.rating) + d + (r.medals ? " " + medalStr(r.medals) : "")); });
+      out.push("");
+    });
+    var save = UI.allPairs; UI.allPairs = false; var dp = boardRows(C, "D").slice(0,5); UI.allPairs = save;
+    if (dp.length){ out.push("*Top doubles pairs*"); dp.forEach(function(r,i){ out.push((i+1) + ". " + r.name + " – " + Math.round(r.rating)); }); }
+    return out.join("\n").trim();
+  }
+
+  function renderStops(main){
+    var stops = sortedStops();
+    if (!UI.stop || (UI.stop !== "__new" && !S.stops[UI.stop])) UI.stop = stops.length ? stops[stops.length-1].id : null;
+    if (UI.stop === "__new" && !isAdmin()) UI.stop = stops.length ? stops[stops.length-1].id : null;
+    var chips = el("div",{cls:"chips", role:"group", "aria-label":"Tour stops"});
+    stops.forEach(function(s){ chips.appendChild(el("button",{text:s.name, "aria-pressed": UI.stop === s.id ? "true" : "false", onclick:function(){ UI.stop = s.id; render(); }})); });
+    if (isAdmin()) chips.appendChild(el("button",{text:"+ New stop", "aria-pressed": UI.stop === "__new" ? "true" : "false", onclick:function(){ UI.stop = "__new"; render(); }}));
+    main.appendChild(chips);
+    if (UI.stop === "__new"){ main.appendChild(newStopForm(stops.length + 1)); return; }
+    if (!UI.stop){ main.appendChild(el("div",{cls:"empty", text: isAdmin() ? "Add the first tour stop to start entering scores." : "No tour stops yet."})); return; }
+    var stop = S.stops[UI.stop];
+    var ms = stopMatches(stop.id);
+    var done = ms.filter(scored).length;
+    main.appendChild(el("div",{cls:"stophead"},[
+      el("div",null,[el("h2",{text:stop.name}), el("div",{cls:"meta", text:[fmtDate(stop.date), stop.venue, stop.total ? ("Games to " + stop.total + " points total") : ""].filter(Boolean).join("  ·  ")})]),
+      el("div",{cls:"meta", text: done + " of " + ms.length + " scored"})
+    ]));
+    if (ms.length){
+      main.appendChild(el("p",{cls:"note", text: stop.total ? "Tap a score box to enter a result. Type one team's score and the other fills in by itself." : "Tap a score box to enter a result."}));
+      var bar = el("div",{cls:"who-bar"});
+      if (who.name){
+        bar.appendChild(el("span",{text:"Entering scores as " + who.name}));
+        bar.appendChild(el("button",{cls:"linkbtn", text:"Change", onclick:function(){ openWho(null); }}));
+      }
+      if (who.name) main.appendChild(bar);
+    }
+    var cups = []; var byCup = {};
+    ms.forEach(function(m){ var c = m.cup || "Cup"; if (!byCup[c]){ byCup[c] = []; cups.push(c); } byCup[c].push(m); });
+    if (!ms.length) main.appendChild(el("div",{cls:"empty", text: isAdmin() ? "No matches yet. Add them below." : "No matches yet."}));
+    cups.forEach(function(c){
+      var list = byCup[c];
+      main.appendChild(el("div",{cls:"cup"},[el("h3",{text:c}), el("span",{text: list.filter(scored).length + "/" + list.length + " scored"})]));
+      var lastR = null;
+      list.forEach(function(m){
+        if (m.round !== lastR){ lastR = m.round; main.appendChild(el("div",{cls:"rnd", text:"Round " + m.round + (m.time ? ", " + m.time : "")})); }
+        main.appendChild(matchCard(m, stop));
+      });
+      var tbl = cupTable(list);
+      if (tbl.length){
+        var det = el("details",{style:"margin:8px 0 4px"});
+        det.appendChild(el("summary",{text:"Standings for " + c, style:"cursor:pointer;font-weight:600;font-size:15px;padding:6px 2px"}));
+        var t = el("table",{cls:"standings"}); var tb = el("tbody");
+        tbl.forEach(function(row,i){ tb.appendChild(el("tr",null,[el("td",{text:String(i+1)}), el("td",{text:nameOf(row.id) + "  (" + row.w + "W/" + row.g + "P)"}), el("td",{text:String(row.pts)})])); });
+        t.appendChild(tb); det.appendChild(t); main.appendChild(det);
+      }
+    });
+    if (isAdmin()) main.appendChild(addMatchForm(stop, cups, ms));
+    if (done){
+      var sh = el("button",{cls:"btn ghost wide", text:"Share " + stop.name + " standings", onclick:function(){ openShare(stopText(stop, cups, byCup)); }});
+      sh.style.marginTop = "12px"; main.appendChild(sh);
+    }
+  }
+
+  function stopText(stop, cups, byCup){
+    var out = ["🎾 *" + stop.name.toUpperCase() + "* 🎾", ""]; var md = ["🥇","🥈","🥉"];
+    cups.forEach(function(c){ var t = cupTable(byCup[c]); if (!t.length) return; out.push("*" + c + "*");
+      t.forEach(function(r,i){ out.push((md[i] || (i+1) + ".") + " " + nameOf(r.id) + " – " + r.pts + " pts (" + r.w + "W/" + r.g + "P)"); }); out.push(""); });
+    return out.join("\n").trim();
+  }
+
+  /* ---------- Score entry ---------- */
+  var timers = {};
+  function matchCard(m, stop){
+    var card = el("div",{cls:"match"});
+    card.appendChild(el("div",{cls:"ct", text: m.court ? "C" + m.court : "–"}));
+    var sides = el("div");
+    var fin = scored(m);
+    function side(ids, val, key){
+      var row = el("div",{cls:"side" + (fin && ((key==="sa" && m.sa > m.sb) || (key==="sb" && m.sb > m.sa)) ? " won" : "")},[el("div",{cls:"who", text:pairName(ids)})]);
+      var inp = el("input",{cls:"sc", type:"text", inputmode:"numeric", pattern:"[0-9]*", maxlength:"3", autocomplete:"off", placeholder:"–", "aria-label":"Score for " + pairName(ids)});
+      inp.value = (typeof val === "number") ? String(val) : "";
+      row.appendChild(inp); return {row:row, inp:inp};
+    }
+    var A = side(m.a, m.sa, "sa"), B = side(m.b, m.sb, "sb");
+    sides.appendChild(A.row); sides.appendChild(B.row); card.appendChild(sides);
+
+    function onIn(me, other){
+      var v = me.inp.value.replace(/[^0-9]/g,""); if (v !== me.inp.value) me.inp.value = v;
+      if (stop.total){
+        if (v !== ""){ var n = Math.min(parseInt(v,10), stop.total); me.inp.value = String(n); other.inp.value = String(stop.total - n); }
+        else other.inp.value = "";
+      }
+      clearTimeout(timers[m.id]); timers[m.id] = setTimeout(save, 900);
+    }
+    function save(){
+      clearTimeout(timers[m.id]);
+      var a = A.inp.value, b = B.inp.value;
+      var next;
+      if (a === "" && b === "") next = {sa:null, sb:null};
+      else if (a !== "" && b !== "") next = {sa:parseInt(a,10), sb:parseInt(b,10)};
+      else return;
+      var cur = pending[m.id] || {sa:m.sa, sb:m.sb};
+      if (next.sa === cur.sa && next.sb === cur.sb) return;
+      submitScore(m.id, next);
+    }
+    A.inp.addEventListener("input", function(){ onIn(A, B); });
+    B.inp.addEventListener("input", function(){ onIn(B, A); });
+    [A.inp, B.inp].forEach(function(i){ i.addEventListener("blur", save); i.addEventListener("keydown", function(e){ if (e.key === "Enter") i.blur(); }); });
+
+    var foot = el("div",{cls:"mfoot"});
+    var st = status[m.id];
+    var byText = st ? st.text : (m.enteredBy && fin ? "Entered by " + m.enteredBy : "");
+    foot.appendChild(el("span",{cls:"by" + (st && st.err ? " err" : ""), text: byText}));
+    if (isAdmin()){
+      var armed = false;
+      var del = el("button",{cls:"del", text:"Delete match", onclick:function(){
+        if (!armed){ armed = true; del.textContent = "Tap again to delete"; setTimeout(function(){ armed = false; del.textContent = "Delete match"; }, 3000); return; }
+        del.disabled = true; del.textContent = "Deleting…";
+        adminPost({action:"deleteMatch", matchId:m.id}).then(function(res){
+          if (res.ok){ delete S.matches[m.id]; render(); load(true); }
+          else { del.disabled = false; del.textContent = "Delete match"; toast(res.error); }
+        });
+      }});
+      foot.appendChild(del);
+    }
+    if (byText || isAdmin()) card.appendChild(foot);
+    return card;
+  }
+
+  var queued = null;
+  function submitScore(id, next){
+    if (!who.name || !who.pin){ queued = {id:id, next:next}; openWho(null); return; }
+    pending[id] = next;
+    var m = S.matches[id]; if (m){ m.sa = next.sa; m.sb = next.sb; }
+    status[id] = {text:"Saving…"};
+    render();
+    post({action:"score", name:who.name, pin:who.pin, matchId:id, sa:next.sa, sb:next.sb}).then(function(res){
+      if (pending[id] !== next) return;   // a newer edit is on its way
+      delete pending[id];
+      if (res.ok){
+        delete status[id];
+        if (res.match && S.matches[id]){ S.matches[id].enteredBy = res.match.enteredBy; }
+        render(); load(true);
+      } else if (res.badPin){
+        who.pin = ""; lsSet("mt-who", JSON.stringify(who));
+        status[id] = {text:"Not saved yet", err:true};
+        queued = {id:id, next:next};
+        openWho(res.error + " Check this week's PIN with the organiser.");
+        load(true);
+      } else {
+        status[id] = {text:"Not saved: " + (res.error || "try again"), err:true};
+        render(); load(true);
+      }
+    });
+  }
+
+  /* ---------- Organiser forms ---------- */
+  function playerOptions(sel, placeholder){
+    sel.appendChild(el("option",{value:"", text:placeholder}));
+    var ps = Object.keys(S.players).map(function(k){ return S.players[k]; }).sort(function(a,b){ return a.name.localeCompare(b.name); });
+    ps.forEach(function(p){ sel.appendChild(el("option",{value:p.id, text:p.name})); });
+  }
+
+  function addMatchForm(stop, cups, ms){
+    var card = el("div",{cls:"card"},[el("h3",{text:"Add a match"})]);
+    var cupIn = el("input",{type:"text", value: cups.length ? cups[cups.length-1] : "", placeholder:"e.g. Mixed Mayhem Cup", list:"cupList"});
+    var dl = el("datalist",{id:"cupList"}); cups.forEach(function(c){ dl.appendChild(el("option",{value:c})); });
+    var lastRound = ms.length ? Math.max.apply(null, ms.map(function(m){ return m.round || 1; })) : 1;
+    var rIn = el("input",{type:"text", inputmode:"numeric", value:String(lastRound)});
+    var cIn = el("select"); ["1","2","3","4"].forEach(function(c){ cIn.appendChild(el("option",{value:c, text:"Court " + c})); });
+    var tIn = el("input",{type:"text", placeholder:"e.g. 9:00"});
+    var sels = [0,1,2,3].map(function(i){ var s = el("select"); playerOptions(s, i < 2 ? "Team 1 player" : "Team 2 player"); s.style.marginBottom = "6px"; return s; });
+    var msg = el("div",{cls:"msg"});
+    card.appendChild(el("div",{cls:"field"},[el("label",{text:"Cup"}), cupIn, dl]));
+    card.appendChild(el("div",{cls:"grid3"},[el("div",{cls:"field"},[el("label",{text:"Round"}), rIn]), el("div",{cls:"field"},[el("label",{text:"Court"}), cIn]), el("div",{cls:"field"},[el("label",{text:"Time"}), tIn])]));
+    card.appendChild(el("div",{cls:"field"},[el("label",{text:"Team 1"}), sels[0], sels[1]]));
+    card.appendChild(el("div",{cls:"field"},[el("label",{text:"Team 2"}), sels[2], sels[3]]));
+    card.appendChild(msg);
+    var btn = el("button",{cls:"btn primary wide", text:"Add match", onclick:function(){
+      var ids = sels.map(function(s){ return s.value; });
+      if (ids.some(function(v){ return !v; })) { msg.textContent = "Pick all four players."; return; }
+      if (new Set(ids).size !== 4) { msg.textContent = "Each player can only appear once in a match."; return; }
+      var cup = cupIn.value.trim() || "Cup";
+      var cupIdx = cups.indexOf(cup); if (cupIdx < 0) cupIdx = cups.length;
+      msg.textContent = ""; btn.disabled = true; btn.textContent = "Adding…";
+      adminPost({action:"addMatch", stop:stop.id, cup:cup, cupIdx:cupIdx, round:rIn.value, court:cIn.value, time:tIn.value, a1:ids[0], a2:ids[1], b1:ids[2], b2:ids[3]}).then(function(res){
+        btn.disabled = false; btn.textContent = "Add match";
+        if (res.ok){ document.activeElement && document.activeElement.blur && document.activeElement.blur(); load(); }
+        else msg.textContent = res.error;
+      });
+    }});
+    card.appendChild(btn);
+    return card;
+  }
+
+  function newStopForm(n){
+    var card = el("div",{cls:"card"},[el("h3",{text:"New tour stop"})]);
+    var nm = el("input",{type:"text", value:"Tour Stop " + n});
+    var dt = el("input",{type:"date", value:new Date().toISOString().slice(0,10)});
+    var vn = el("input",{type:"text", placeholder:"e.g. Padel In Ar Rabwah"});
+    var tot = el("input",{type:"text", inputmode:"numeric", placeholder:"e.g. 21, or leave empty"});
+    var msg = el("div",{cls:"msg"});
+    card.appendChild(el("div",{cls:"field"},[el("label",{text:"Name"}), nm]));
+    card.appendChild(el("div",{cls:"field"},[el("label",{text:"Date"}), dt]));
+    card.appendChild(el("div",{cls:"field"},[el("label",{text:"Venue"}), vn]));
+    card.appendChild(el("div",{cls:"field"},[el("label",{text:"Total points per game, if fixed"}), tot]));
+    card.appendChild(el("p",{cls:"note", text:"If games are played to a fixed total (like 21), the second score fills in by itself. Ratings work with any format."}));
+    card.appendChild(msg);
+    var btn = el("button",{cls:"btn primary wide", text:"Create stop", onclick:function(){
+      if (!nm.value.trim()) { msg.textContent = "Give the stop a name."; return; }
+      btn.disabled = true; btn.textContent = "Creating…";
+      adminPost({action:"addStop", name:nm.value, date:dt.value, venue:vn.value, total:tot.value}).then(function(res){
+        btn.disabled = false; btn.textContent = "Create stop";
+        if (res.ok){ UI.stop = res.id; if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); load(); }
+        else msg.textContent = res.error;
+      });
+    }});
+    card.appendChild(btn);
+    return card;
+  }
+
+  function renderPlayers(main){
+    var ps = Object.keys(S.players).map(function(k){ return S.players[k]; }).sort(function(a,b){ return a.gender.localeCompare(b.gender) * -1 || a.name.localeCompare(b.name); });
+    var C = compute();
+    if (isAdmin()){
+      var card = el("div",{cls:"card"},[el("h3",{text:"Add a player"})]);
+      var nm = el("input",{type:"text", placeholder:"Name", autocomplete:"off"});
+      var g = el("select"); g.appendChild(el("option",{value:"M", text:"Men's ranking"})); g.appendChild(el("option",{value:"F", text:"Women's ranking"}));
+      var msg = el("div",{cls:"msg"});
+      card.appendChild(el("div",{cls:"grid2"},[el("div",{cls:"field"},[el("label",{text:"Name"}), nm]), el("div",{cls:"field"},[el("label",{text:"Ranked in"}), g])]));
+      card.appendChild(msg);
+      var btn = el("button",{cls:"btn primary wide", text:"Add player", onclick:function(){
+        var n = nm.value.trim(); if (!n){ msg.textContent = "Type a name first."; return; }
+        btn.disabled = true; btn.textContent = "Adding…";
+        adminPost({action:"addPlayer", name:n, gender:g.value}).then(function(res){
+          btn.disabled = false; btn.textContent = "Add player";
+          if (res.ok){ if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); load(); }
+          else msg.textContent = res.error;
+        });
+      }});
+      card.appendChild(btn);
+      main.appendChild(card);
+    }
+    if (!ps.length){ main.appendChild(el("div",{cls:"empty", text:"No players yet."})); return; }
+    var ul = el("ul",{cls:"plist"});
+    ps.forEach(function(p){
+      var x = C.st[p.id];
+      ul.appendChild(el("li",null,[el("div",null,[el("b",{text:p.name}), document.createTextNode("  "), el("span",{text: p.gender === "F" ? "Women" : "Men"})]), el("span",{text: x ? (x.games + " games, " + Object.keys(x.stops).length + (Object.keys(x.stops).length === 1 ? " stop" : " stops")) : "Not played yet"})]));
+    });
+    main.appendChild(ul);
+  }
+
+  /* ---------- Sheets (pop-ups) ---------- */
+  function openSheet(id){ document.getElementById(id).classList.add("open"); }
+  function closeSheet(id){ document.getElementById(id).classList.remove("open"); }
+  document.querySelectorAll(".sheet").forEach(function(sh){
+    sh.addEventListener("click", function(e){ if (e.target === sh || (e.target.hasAttribute && e.target.hasAttribute("data-close"))){ sh.classList.remove("open"); if (sh.id === "whoSheet" && queued){ status[queued.id] = {text:"Not saved yet", err:true}; queued = null; render(); } } });
+  });
+  function toast(t){ var n = el("div",{cls:"status bad", text:t}); var m = document.getElementById("main"); m.insertBefore(n, m.firstChild); setTimeout(function(){ n.remove(); }, 5000); }
+
+  // Share
+  var ta = document.getElementById("shareText"), shareToast = document.getElementById("shareToast");
+  function openShare(text){ ta.value = text; shareToast.textContent = ""; openSheet("shareSheet"); }
+  document.getElementById("copyBtn").addEventListener("click", function(){
+    var txt = ta.value;
+    function fallback(){ ta.removeAttribute("readonly"); ta.focus(); ta.select(); ta.setSelectionRange(0, txt.length); var ok = false; try { ok = document.execCommand("copy"); } catch(e){} ta.setAttribute("readonly",""); shareToast.textContent = ok ? "Copied. Paste it into WhatsApp." : "Text selected. Long-press and choose Copy."; }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(function(){ shareToast.textContent = "Copied. Paste it into WhatsApp."; }, fallback); else fallback();
+  });
+
+  // Name + Score PIN
+  var whoName = document.getElementById("whoName"), whoPin = document.getElementById("whoPin"), whoMsg = document.getElementById("whoMsg"), whoSave = document.getElementById("whoSave");
+  function openWho(err){
+    whoName.value = who.name || ""; whoPin.value = who.pin || ""; whoMsg.textContent = err || "";
+    openSheet("whoSheet");
+    setTimeout(function(){ (who.name ? whoPin : whoName).focus(); }, 50);
+  }
+  whoSave.addEventListener("click", function(){
+    var n = whoName.value.trim(), p = whoPin.value.trim();
+    if (!n){ whoMsg.textContent = "Type your name."; return; }
+    if (!p){ whoMsg.textContent = "Type the Score PIN."; return; }
+    whoSave.disabled = true; whoSave.textContent = "Checking…";
+    post({action:"checkScorePin", pin:p}).then(function(res){
+      whoSave.disabled = false; whoSave.textContent = "Save and continue";
+      if (!res.ok){ whoMsg.textContent = res.error; return; }
+      who = {name:n, pin:p}; lsSet("mt-who", JSON.stringify(who));
+      closeSheet("whoSheet");
+      var q = queued; queued = null;
+      if (q) submitScore(q.id, q.next); else render();
+    });
+  });
+  whoPin.addEventListener("keydown", function(e){ if (e.key === "Enter") whoSave.click(); });
+
+  // Admin PIN
+  var adminIn = document.getElementById("adminPin"), adminMsg = document.getElementById("adminMsg"), adminSave = document.getElementById("adminSave");
+  function openAdmin(){ adminIn.value = ""; adminMsg.textContent = ""; openSheet("adminSheet"); setTimeout(function(){ adminIn.focus(); }, 50); }
+  adminSave.addEventListener("click", function(){
+    var p = adminIn.value.trim(); if (!p){ adminMsg.textContent = "Type the Admin PIN."; return; }
+    adminSave.disabled = true; adminSave.textContent = "Checking…";
+    post({action:"checkAdmin", adminPin:p}).then(function(res){
+      adminSave.disabled = false; adminSave.textContent = "Unlock";
+      if (!res.ok){ adminMsg.textContent = res.error; return; }
+      adminPin = p; ssSet("mt-admin", p);
+      closeSheet("adminSheet"); render();
+    });
+  });
+  adminIn.addEventListener("keydown", function(e){ if (e.key === "Enter") adminSave.click(); });
+
+  /* ---------- Start ---------- */
+  document.querySelectorAll("nav.tabs button").forEach(function(b){
+    b.addEventListener("click", function(){ UI.tab = b.dataset.tab; lsSet("mt-tab", UI.tab); render(); window.scrollTo(0,0); });
+  });
+  document.addEventListener("focusout", function(){ setTimeout(function(){ if (UI.pendingRender) render(); }, 0); });
+
+  try { var cached = JSON.parse(lsGet("mt-cache") || "null"); if (cached && cached.ok && configured){ apply(cached); S.state = "ready"; } } catch(e){}
+  render();
+  load();
+  setInterval(function(){ if (!document.hidden) load(true); }, 20000);
+  document.addEventListener("visibilitychange", function(){ if (!document.hidden) load(true); });
+})();
+</script>
+</body>
+</html>
