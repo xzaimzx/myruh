@@ -1,5 +1,5 @@
 /**
- * Malaysiano Tour – Google Sheets backend
+ * MYRUH Padelers Tour – Google Sheets backend
  *
  * Paste this whole file into Extensions → Apps Script in your Google Sheet.
  * 1. Choose "setup" in the function dropdown and click Run (once only).

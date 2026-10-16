@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0A1A3F">
+<meta name="theme-color" content="#362164">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Malaysiano">
+<meta name="apple-mobile-web-app-title" content="MYRUH Tour">
 <meta name="format-detection" content="telephone=no">
-<title>Malaysiano Tour</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230A1A3F'/%3E%3Ccircle cx='32' cy='32' r='17' fill='%23FFCC00'/%3E%3Cpath d='M18 26c9 4 19 4 28 0M18 38c9-4 19-4 28 0' stroke='%230A1A3F' stroke-width='3' fill='none'/%3E%3C/svg%3E">
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230A1A3F'/%3E%3Ccircle cx='32' cy='32' r='17' fill='%23FFCC00'/%3E%3C/svg%3E">
+<title>MYRUH Padelers Tour</title>
+<link rel="icon" href="img/icon-180.png">
+<link rel="apple-touch-icon" href="img/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
@@ -19,21 +19,21 @@
 </script>
 <style>
 :root{
-  --bg:#F2F4F9; --surface:#FFFFFF; --ink:#0A1A3F; --muted:#56617A; --line:#D8DEEA;
-  --brand:#0A1A3F; --brand-ink:#FFFFFF; --gold:#FFCC00; --red:#C8102E; --pos:#1C7A3C; --neg:#C8102E;
-  --chip:#E7EBF4;
+  --bg:#F4F2F9; --surface:#FFFFFF; --ink:#2A1A52; --muted:#625A78; --line:#DDD8EA;
+  --brand:#362164; --brand-ink:#FFFFFF; --gold:#FEDD06; --red:#F58C4B; --pos:#1C7A3C; --neg:#C8102E;
+  --chip:#EAE6F3; --accent:#C0561B;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#06102A; --surface:#0E1C42; --ink:#EDF1FA; --muted:#9CA9C5; --line:#22345F;
-    --brand:#0A1A3F; --brand-ink:#FFFFFF; --gold:#FFCC00; --red:#FF6E7C; --pos:#62D48C; --neg:#FF7B86;
-    --chip:#182A57;
+    --bg:#1A1033; --surface:#271848; --ink:#F1EDFA; --muted:#AFA5C8; --line:#3B2A66;
+    --brand:#362164; --brand-ink:#FFFFFF; --gold:#FEDD06; --red:#F7A15F; --pos:#62D48C; --neg:#FF7B86;
+    --chip:#2F1F57; --accent:#F7AF27;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#06102A; --surface:#0E1C42; --ink:#EDF1FA; --muted:#9CA9C5; --line:#22345F;
-  --brand:#0A1A3F; --brand-ink:#FFFFFF; --gold:#FFCC00; --red:#FF6E7C; --pos:#62D48C; --neg:#FF7B86;
-  --chip:#182A57;
+  --bg:#1A1033; --surface:#271848; --ink:#F1EDFA; --muted:#AFA5C8; --line:#3B2A66;
+  --brand:#362164; --brand-ink:#FFFFFF; --gold:#FEDD06; --red:#F7A15F; --pos:#62D48C; --neg:#FF7B86;
+  --chip:#2F1F57; --accent:#F7AF27;
 }
 *,*::before,*::after{box-sizing:border-box}
 button,input,select{-webkit-appearance:none;appearance:none;touch-action:manipulation;font:inherit;color:inherit}
@@ -42,16 +42,17 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:"Barlow",system-
 .wrap{max-width:620px;margin:0 auto;padding:0 14px 48px}
 
 header.top{background:var(--brand);color:var(--brand-ink);padding:calc(20px + env(safe-area-inset-top,0px)) 18px 0;position:relative;overflow:hidden}
-header.top .inner{max-width:620px;margin:0 auto;position:relative;min-height:150px}
+header.top .inner{max-width:620px;margin:0 auto;position:relative;min-height:160px}
 header.top .title{position:relative;z-index:2;max-width:56%;padding-bottom:16px}
-header.top h1{margin:0;font-family:Anton,"Barlow Condensed",sans-serif;font-weight:400;font-size:40px;line-height:.95;color:var(--gold);letter-spacing:.5px;text-shadow:0 2px 12px rgba(10,26,63,.6)}
-header.top p{margin:8px 0 0;font-family:"Barlow Condensed",sans-serif;font-size:17px;font-weight:600;opacity:.92}
-header.top .stripe{position:absolute;right:-40px;top:0;bottom:0;width:150px;background:var(--red);transform:skewX(-14deg);opacity:.95}
+header.top .logo{display:block;height:116px;width:auto;margin:-6px 0 0 -6px}
+header.top h1{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0;font-family:Anton,"Barlow Condensed",sans-serif;font-weight:400;font-size:40px;line-height:.95;color:var(--gold);letter-spacing:.5px;text-shadow:none}
+header.top p{margin:4px 0 0;font-family:"Barlow Condensed",sans-serif;font-size:17px;font-weight:600;opacity:.92}
+header.top .stripe{position:absolute;right:-40px;top:0;bottom:0;width:150px;background:linear-gradient(180deg,#F7AF27,#F58C4B);transform:skewX(-14deg);opacity:.95}
 header.top .stripe2{position:absolute;right:120px;top:0;bottom:0;width:14px;background:var(--gold);transform:skewX(-14deg)}
-.stars{position:absolute;right:-8px;bottom:0;width:200px;height:150px;z-index:1;pointer-events:none}
+.stars{position:absolute;right:-8px;bottom:0;width:200px;height:160px;z-index:1;pointer-events:none}
 .stars img{position:absolute;bottom:0;width:auto;display:block;filter:drop-shadow(0 4px 10px rgba(0,0,0,.35))}
-.stars .du{left:0;height:150px}
-.stars .omar{right:0;height:126px}
+.stars .du{left:0;height:160px}
+.stars .omar{right:0;height:134px}
 @media (min-width:560px){header.top .inner{min-height:180px}.stars{width:250px;height:180px}.stars .du{height:180px}.stars .omar{height:152px}header.top h1{font-size:52px}}
 @media (max-width:350px){header.top h1{font-size:34px}.stars{width:170px;height:130px}.stars .du{height:130px}.stars .omar{height:110px}}
 
@@ -69,7 +70,7 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
 .row{display:grid;grid-template-columns:44px 1fr auto;align-items:center;gap:10px;padding:12px 6px 12px 2px;border-bottom:1px solid var(--line)}
 .row .rk{font-family:Anton,sans-serif;font-size:28px;line-height:1;text-align:center;color:var(--muted)}
 .row.top1 .rk{color:var(--ink)}
-.row.top1 .rk span{background:var(--gold);color:#0A1A3F;display:inline-block;min-width:38px;padding:4px 0 2px;border-radius:6px}
+.row.top1 .rk span{background:var(--gold);color:#362164;display:inline-block;min-width:38px;padding:4px 0 2px;border-radius:6px}
 .row .nm{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:21px;line-height:1.1}
 .row .sub{font-size:13.5px;color:var(--muted);margin-top:2px}
 .row .medals{font-size:13px;margin-left:4px;letter-spacing:1px}
@@ -149,7 +150,7 @@ details.how .rules li{font-size:15.5px}
 .lineup b{font-family:"Barlow Condensed",sans-serif;font-size:17px}
 .rules{margin:6px 0 0;padding:0;list-style:none;counter-reset:r}
 .rules li{counter-increment:r;display:grid;grid-template-columns:36px 1fr;gap:10px;align-items:start;padding:12px 2px;border-bottom:1px solid var(--line);font-size:16px}
-.rules li::before{content:counter(r);font-family:Anton,sans-serif;font-size:22px;line-height:1.1;color:var(--red);text-align:center}
+.rules li::before{content:counter(r);font-family:Anton,sans-serif;font-size:22px;line-height:1.1;color:var(--accent);text-align:center}
 .event{background:var(--brand);color:#fff;border-radius:14px;padding:14px 16px;margin:14px 0}
 .event h2{margin:0 0 6px;font-family:Anton,sans-serif;font-weight:400;font-size:26px;color:var(--gold)}
 .event div{font-family:"Barlow Condensed",sans-serif;font-size:18px;font-weight:600}
@@ -163,8 +164,9 @@ details.how .rules li{font-size:15.5px}
   <div class="stripe" aria-hidden="true"></div><div class="stripe2" aria-hidden="true"></div>
   <div class="inner">
     <div class="title">
-      <h1>Malaysiano Tour</h1>
-      <p>Season 2026/2027 · every Tour Stop counts</p>
+      <h1>MYRUH Padelers Tour</h1>
+      <img class="logo" src="img/logo.webp" alt="MYRUH Padelers">
+      <p><b style="color:var(--gold);letter-spacing:1px">TOUR</b> · Season 2026/2027</p>
     </div>
     <div class="stars" aria-hidden="true">
       <img class="omar" src="img/omar.webp" alt="">
@@ -484,7 +486,7 @@ details.how .rules li{font-size:15.5px}
   }
 
   function rankText(C){
-    var out = ["🏆 *MALAYSIANO TOUR RANKINGS* 🏆", ""];
+    var out = ["🏆 *MYRUH PADELERS TOUR RANKINGS* 🏆", ""];
     [["M","Men"],["F","Women"]].forEach(function(b){
       var rows = boardRows(C, b[0]); if (!rows.length) return;
       out.push("*" + b[1] + "*");
@@ -621,7 +623,7 @@ details.how .rules li{font-size:15.5px}
     rules.forEach(function(r){ ol.appendChild(el("li",null,[el("span",{text:r})])); });
     card.appendChild(ol);
     card.appendChild(el("button",{cls:"btn ghost wide", text:"Share rules", style:"margin-top:12px", onclick:function(){
-      openShare(["📋 *MALAYSIANO WEEKLY CHALLENGE RULES* 📋", ""].concat(rules.map(function(r,i){ return (i+1) + ". " + r; })).join("\n"));
+      openShare(["📋 *MYRUH PADELERS TOUR RULES* 📋", ""].concat(rules.map(function(r,i){ return (i+1) + ". " + r; })).join("\n"));
     }}));
     return card;
   }

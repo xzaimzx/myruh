@@ -1,6 +1,6 @@
-# Malaysiano Tour
+# MYRUH Padelers Tour
 
-Weekly padel rankings for the Malaysiano Weekly Challenge in Riyadh.
+Weekly padel rankings for the MYRUH Padelers Tour in Riyadh. Season 2026/2027.
 
 - `index.html` is the website, served by GitHub Pages.
 - `Code.gs` is the Google Apps Script that connects the website to the Google Sheet (tabs: Players, Stops, Matches, ScoreLog, Settings). It runs inside the sheet's Apps Script editor; the copy here is for reference.
