@@ -48,10 +48,10 @@ function setup() {
   var players = ss.getSheetByName('Players');
   if (players.getLastRow() < 2) {
     var roster = [
-      ['omar', 'Omar', 'M'], ['miza', 'Miza', 'F'], ['faisal', 'Faisal', 'M'], ['ain', 'Ain', 'F'],
-      ['zaim', 'Zaim', 'M'], ['farah', 'Farah', 'F'], ['shazwan', 'Shazwan', 'M'], ['fakhri', 'Fakhri', 'M'],
-      ['qayyum', 'Qayyum', 'M'], ['amir', 'Amir', 'M'], ['derek', 'Derek', 'M'], ['du', 'Du', 'M'],
-      ['amirul', 'Amirul', 'M']
+      ['omar', 'Omar H', 'M'], ['miza', 'Amiza', 'F'], ['faisal', 'Faisal J', 'M'], ['ain', 'NF Ain', 'F'],
+      ['zaim', 'Zaim Z', 'M'], ['farah', 'Farah AN', 'F'], ['shazwan', 'Shazwan AR', 'M'], ['fakhri', 'Fakri G', 'M'],
+      ['qayyum', 'Qayyum Z', 'M'], ['amir', 'Amir AJ', 'M'], ['derek', 'Derek P', 'M'], ['du', 'Du', 'M'],
+      ['amirul', 'Amirul I', 'M']
     ];
     players.getRange(2, 1, roster.length, 4).setValues(roster.map(function (r) { return r.concat([now]); }));
   }

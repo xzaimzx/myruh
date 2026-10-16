@@ -41,12 +41,22 @@ html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 60px)}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;padding-bottom:env(safe-area-inset-bottom,0px)}
 .wrap{max-width:620px;margin:0 auto;padding:0 14px 48px}
 
-header.top{background:var(--brand);color:var(--brand-ink);padding:calc(20px + env(safe-area-inset-top,0px)) 18px 18px;position:relative;overflow:hidden}
-header.top .inner{max-width:620px;margin:0 auto;position:relative;z-index:1}
-header.top h1{margin:0;font-family:Anton,"Barlow Condensed",sans-serif;font-weight:400;font-size:44px;line-height:.95;color:var(--gold);letter-spacing:.5px}
-header.top p{margin:6px 0 0;font-family:"Barlow Condensed",sans-serif;font-size:18px;font-weight:600;opacity:.92}
+header.top{background:var(--brand);color:var(--brand-ink);padding:calc(20px + env(safe-area-inset-top,0px)) 18px 0;position:relative;overflow:hidden}
+header.top .inner{max-width:620px;margin:0 auto;position:relative;min-height:228px}
+header.top .title{position:relative;z-index:2;max-width:58%;padding-bottom:18px}
+header.top h1{margin:0;font-family:Anton,"Barlow Condensed",sans-serif;font-weight:400;font-size:44px;line-height:.95;color:var(--gold);letter-spacing:.5px;text-shadow:0 2px 12px rgba(10,26,63,.6)}
+header.top p{margin:8px 0 0;font-family:"Barlow Condensed",sans-serif;font-size:18px;font-weight:600;opacity:.92}
 header.top .stripe{position:absolute;right:-40px;top:0;bottom:0;width:150px;background:var(--red);transform:skewX(-14deg);opacity:.95}
 header.top .stripe2{position:absolute;right:120px;top:0;bottom:0;width:14px;background:var(--gold);transform:skewX(-14deg)}
+.stars{position:absolute;right:-6px;bottom:0;width:250px;height:228px;z-index:1;pointer-events:none}
+.stars img{position:absolute;bottom:0;height:100%;width:auto;display:block;filter:drop-shadow(0 4px 10px rgba(0,0,0,.35))}
+.stars .du{left:0;height:228px}
+.stars .omar{right:0;height:184px}
+.stars span{position:absolute;bottom:6px;font-family:Anton,"Barlow Condensed",sans-serif;font-size:15px;letter-spacing:2px;color:var(--gold);background:var(--brand);padding:1px 7px 0;border-radius:3px;z-index:2}
+.stars .ldu{left:30px}
+.stars .lomar{right:40px}
+@media (min-width:560px){header.top .inner{min-height:260px}.stars{width:300px;height:260px}.stars .du{height:260px}.stars .omar{height:212px}header.top h1{font-size:56px}}
+@media (max-width:350px){header.top .title{max-width:62%}.stars{width:190px;height:190px}.stars .du{height:190px}.stars .omar{height:150px}.stars .ldu{left:22px}.stars .lomar{right:28px}}
 
 nav.tabs{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;gap:6px;padding:calc(12px + env(safe-area-inset-top,0px)) 0 10px;margin-top:calc(-1 * env(safe-area-inset-top,0px));border-bottom:1px solid var(--line)}
 nav.tabs button{flex:1;border:1.5px solid var(--line);background:var(--surface);font-weight:600;font-size:15px;padding:9px 4px;border-radius:999px;cursor:pointer;white-space:nowrap}
@@ -141,8 +151,15 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
 <header class="top">
   <div class="stripe" aria-hidden="true"></div><div class="stripe2" aria-hidden="true"></div>
   <div class="inner">
-    <h1>Malaysiano Tour</h1>
-    <p>Season 1 rankings, every stop counts</p>
+    <div class="title">
+      <h1>Malaysiano Tour</h1>
+      <p>Season 1 rankings, every stop counts</p>
+    </div>
+    <div class="stars" aria-hidden="true">
+      <img class="omar" src="img/omar.webp" alt="">
+      <img class="du" src="img/du.webp" alt="">
+      <span class="ldu">DU</span><span class="lomar">OMAR</span>
+    </div>
   </div>
 </header>
 <div class="wrap">
