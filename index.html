@@ -162,7 +162,21 @@ details.how .rules li{font-size:15.5px}
 .event{background:var(--brand);color:#fff;border-radius:14px;padding:14px 16px;margin:14px 0}
 .event h2{margin:0 0 6px;font-family:Anton,sans-serif;font-weight:400;font-size:26px;color:var(--gold)}
 .event div{font-family:"Barlow Condensed",sans-serif;font-size:18px;font-weight:600}
-@media (max-width:380px){nav.tabs button{font-size:13.5px;white-space:normal;padding:6px 4px}}
+@media (max-width:520px){nav.tabs{gap:4px}nav.tabs button{font-size:13px;white-space:normal;padding:6px 3px}}
+.story{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin:14px 0}
+.story img{display:block;width:100%;height:auto}
+.story .body{padding:14px 16px 16px}
+.story .kicker{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:14px;letter-spacing:.6px;text-transform:uppercase;color:var(--accent)}
+.story h2{margin:4px 0 8px;font-family:Anton,sans-serif;font-weight:400;font-size:30px;line-height:1.05}
+.story h3{margin:18px 0 6px;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:22px}
+.story p{margin:0 0 10px;line-height:1.5}
+.story .pair{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0 4px}
+.story figure{margin:0}
+.story figure img{border-radius:10px;aspect-ratio:3/4;object-fit:cover}
+.story figcaption{font-size:13px;color:var(--muted);margin-top:4px;text-align:center}
+.story .facts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.story .facts div{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 6px;text-align:center;font-size:12.5px;color:var(--muted)}
+.story .facts b{display:block;font-family:Anton,sans-serif;font-weight:400;font-size:24px;color:var(--ink)}
 [hidden]{display:none!important}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -185,6 +199,7 @@ details.how .rules li{font-size:15.5px}
 <div class="wrap">
   <nav class="tabs" role="tablist">
     <button role="tab" data-tab="session" aria-selected="true" id="curTab">Tour Stop</button>
+    <button role="tab" data-tab="news" aria-selected="false">Tour News</button>
     <button role="tab" data-tab="tour" aria-selected="false">Tour Rankings</button>
     <button role="tab" data-tab="past" aria-selected="false">Past Tour Stops</button>
   </nav>
@@ -259,7 +274,7 @@ details.how .rules li{font-size:15.5px}
   function ssGet(k){ try { return sessionStorage.getItem(k); } catch(e){ return null; } }
   function ssSet(k, v){ try { if (v === null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch(e){} }
   UI.tab = lsGet("mt-tab") || "session";
-  if (["session","tour","past"].indexOf(UI.tab) < 0) UI.tab = "session";
+  if (["session","news","tour","past"].indexOf(UI.tab) < 0) UI.tab = "session";
   try { var w = JSON.parse(lsGet("mt-who") || "null"); if (w && w.name) who = w; } catch(e){}
   adminPin = ssGet("mt-admin") || "";
 
@@ -407,6 +422,7 @@ details.how .rules li{font-size:15.5px}
     renderOrg();
     var up = document.getElementById("updated");
     up.textContent = S.loadedAt ? "Updated " + S.loadedAt.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"}) + ". Refreshes by itself every 20 seconds." : "";
+    if (UI.tab === "news"){ renderNews(main); return; }
     if (!configured){
       main.appendChild(el("div",{cls:"status bad", text:"This site isn't connected to the Google Sheet yet. The organiser needs to paste the Apps Script Web app URL into index.html."}));
       return;
@@ -525,10 +541,55 @@ details.how .rules li{font-size:15.5px}
     }
   }
 
+  // Tour News stories, newest first. Photos live in img/news/.
+  var NEWS = [{
+    kicker: "Tour Stop 1 · Sat 17 Oct 2026 · Padel In Ar Rabwah",
+    title: "Fakri and Du crowned on a big opening day",
+    hero: "img/news/stop1-group.webp", heroAlt: "All the Tour Stop 1 players lined up at the net with their racquets",
+    intro: ["The MYRUH Padelers Tour is officially up and running. Thirteen players, two courts, 24 games and a lot of noise at Padel In Ar Rabwah, and when the dust settled we had two champions: Fakri G took the Mixed Mayhem Cup and Du took the Smash Showdown Cup."],
+    facts: [["24","games played"],["504","points won"],["16–5","biggest win (twice)"]],
+    photos: [["img/news/stop1-fakri.webp","Mixed Mayhem champion Fakri G receiving his trophy","Fakri G, Mixed Mayhem champion"],["img/news/stop1-du.webp","Smash Showdown champion Du celebrating with his trophy","Du, Smash Showdown champion"]],
+    sections: [
+      ["Mixed Mayhem: Fakri wins it on head-to-head", [
+        "Fakri G finished on 49 points with 3 wins from 4, dead level with Qayyum Z on both points and wins. The tie-breaker went to the only time they met: in the very first round Fakri and Shazwan AR beat Qayyum and Amir AJ 12–9, and that was enough.",
+        "Fakri opened with that 12–9 win, then lost a heart-breaker 10–11 alongside Amir AJ. He answered straight away, edging Omar H and Amiza 11–10 with Amirul I, and saved his best for last. Paired with Du in round 6, he won 16–5, the biggest score of the cup."
+      ]],
+      ["Smash Showdown: Du takes the crown", [
+        "Du came into the second cup unbeaten after going 3 from 3 in Mixed Mayhem, and he started Smash Showdown the same way. He won 14–7 with Fakri in round 1 and 14–7 again with Amir AJ in round 3.",
+        "Two 10–11 losses in the middle tested him, but Du closed the morning with a 12–9 win alongside Zaim Z to finish on 60 points and the Smash Showdown trophy. Across both cups he played 8 games, won 6 and collected 99 points."
+      ]],
+      ["Shout-outs", [
+        "Amir AJ was the man of the Smash Showdown, winning all 5 of his games for 63 points. Shazwan AR won all 4 of his Mixed Mayhem games. Fakri G also hit back-to-back 15–6 wins in Smash for 53 points, making him the top scorer of the day with 102 points.",
+        "See you at Tour Stop 2. Every result from Tour Stop 1 is in Past Tour Stops, and the season standings are in Tour Rankings."
+      ]]
+    ]
+  }];
+  function renderNews(main){
+    NEWS.forEach(function(n){
+      var body = el("div",{cls:"body"},[el("div",{cls:"kicker", text:n.kicker}), el("h2",{text:n.title})]);
+      n.intro.forEach(function(t){ body.appendChild(el("p",{text:t})); });
+      var facts = el("div",{cls:"facts"});
+      n.facts.forEach(function(f){ facts.appendChild(el("div",{},[el("b",{text:f[0]}), document.createTextNode(f[1])])); });
+      body.appendChild(facts);
+      var pair = el("div",{cls:"pair"});
+      n.photos.forEach(function(ph){ pair.appendChild(el("figure",{},[el("img",{src:ph[0], alt:ph[1], loading:"lazy"}), el("figcaption",{text:ph[2]})])); });
+      body.appendChild(pair);
+      n.sections.forEach(function(sec){
+        body.appendChild(el("h3",{text:sec[0]}));
+        sec[1].forEach(function(t){ body.appendChild(el("p",{text:t})); });
+      });
+      main.appendChild(el("article",{cls:"story"},[el("img",{src:n.hero, alt:n.heroAlt}), body]));
+    });
+  }
+
   function renderPast(main){
     var cur = currentStop();
-    var past = sortedStops().filter(function(s){ return !cur || s.id !== cur.id; }).reverse();
-    if (!past.length){ main.appendChild(el("div",{cls:"empty", text:"No past Tour Stops yet. Once the next Tour Stop starts, this one's results will be kept here."})); return; }
+    // A finished stop goes into the archive straight away; the current one also stays on its own tab until the next stop starts.
+    var past = sortedStops().filter(function(s){
+      if (!cur || s.id !== cur.id) return true;
+      var ms = stopMatches(s.id); return ms.length > 0 && ms.every(scored);
+    }).reverse();
+    if (!past.length){ main.appendChild(el("div",{cls:"empty", text:"No past Tour Stops yet. A Tour Stop is added here once all its games are scored."})); return; }
     if (!UI.stop || !past.some(function(s){ return s.id === UI.stop; })) UI.stop = past[0].id;
     var chips = el("div",{cls:"chips", role:"group", "aria-label":"Past Tour Stops"});
     past.forEach(function(s){ chips.appendChild(el("button",{text:s.name, "aria-pressed": UI.stop === s.id ? "true" : "false", onclick:function(){ UI.stop = s.id; render(); }})); });
