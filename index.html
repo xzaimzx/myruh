@@ -49,12 +49,13 @@ header.top h1{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0
 header.top p{margin:4px 0 0;font-family:"Barlow Condensed",sans-serif;font-size:17px;font-weight:600;opacity:.92}
 header.top .stripe{position:absolute;right:-40px;top:0;bottom:0;width:150px;background:linear-gradient(180deg,#F7AF27,#F58C4B);transform:skewX(-14deg);opacity:.95}
 header.top .stripe2{position:absolute;right:120px;top:0;bottom:0;width:14px;background:var(--gold);transform:skewX(-14deg)}
-.stars{position:absolute;right:-8px;bottom:0;width:200px;height:160px;z-index:1;pointer-events:none}
+.stars{position:absolute;right:-8px;bottom:0;width:270px;height:160px;z-index:1;pointer-events:none}
 .stars img{position:absolute;bottom:0;width:auto;display:block;filter:drop-shadow(0 4px 10px rgba(0,0,0,.35))}
-.stars .du{left:0;height:160px}
-.stars .omar{right:0;height:134px}
-@media (min-width:560px){header.top .inner{min-height:180px}.stars{width:250px;height:180px}.stars .du{height:180px}.stars .omar{height:152px}header.top h1{font-size:52px}}
-@media (max-width:350px){header.top h1{font-size:34px}.stars{width:170px;height:130px}.stars .du{height:130px}.stars .omar{height:110px}}
+.stars .du{left:0;height:150px;z-index:1}
+.stars .omar{left:84px;height:126px}
+.stars .fakri{right:0;height:112px;z-index:2}
+@media (min-width:560px){header.top .inner{min-height:180px}.stars{width:330px;height:180px}.stars .du{height:180px}.stars .omar{left:100px;height:152px}.stars .fakri{height:136px}header.top h1{font-size:52px}}
+@media (max-width:350px){header.top h1{font-size:34px}.stars{width:216px;height:124px}.stars .du{height:116px}.stars .omar{left:64px;height:98px}.stars .fakri{height:88px}}
 
 nav.tabs{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;gap:5px;padding:calc(12px + env(safe-area-inset-top,0px)) 0 10px;margin-top:calc(-1 * env(safe-area-inset-top,0px));border-bottom:1px solid var(--line)}
 nav.tabs button{flex:1;min-width:0;border:1.5px solid var(--line);background:var(--surface);font-weight:600;font-size:14.5px;line-height:1.15;padding:8px 4px;border-radius:999px;cursor:pointer;white-space:nowrap}
@@ -191,6 +192,7 @@ details.how .rules li{font-size:15.5px}
       <p><b style="color:var(--gold);letter-spacing:1px">TOUR</b> · Season 2026/2027</p>
     </div>
     <div class="stars" aria-hidden="true">
+      <img class="fakri" src="img/fakri.webp" alt="">
       <img class="omar" src="img/omar.webp" alt="">
       <img class="du" src="img/du.webp" alt="">
     </div>
@@ -350,6 +352,7 @@ details.how .rules li{font-size:15.5px}
   }
 
   /* ---------- Ratings ---------- */
+  var LADY_HANDICAP = 200;
   function compute(){
     var stops = sortedStops();
     var order = {}; stops.forEach(function(s,i){ order[s.id] = i; });
@@ -359,12 +362,15 @@ details.how .rules li{font-size:15.5px}
     var R = {}, st = {}, PR = {}, ps = {}, before = null, beforeP = null;
     var lastStop = all.length ? all[all.length-1].stop : null;
     function r(id){ return R[id] === undefined ? 1000 : R[id]; }
+    function lady(id){ return S.players[id] && S.players[id].gender === "F" ? 1 : 0; }
+    function hc(id){ return r(id) - LADY_HANDICAP * lady(id); }
     function pr(k){ return PR[k] === undefined ? 1000 : PR[k]; }
     function s(id){ return st[id] || (st[id] = {games:0,wins:0,losses:0,share:0,stops:{}}); }
     function sp(k, ids){ return ps[k] || (ps[k] = {ids:ids, games:0, wins:0, losses:0, share:0}); }
     all.forEach(function(m){
       if (m.stop === lastStop && before === null){ before = JSON.parse(JSON.stringify(R)); beforeP = JSON.parse(JSON.stringify(PR)); }
-      var ra = (r(m.a[0]) + r(m.a[1])) / 2, rb = (r(m.b[0]) + r(m.b[1])) / 2;
+      // Handicap: a lady counts LADY_HANDICAP points lower when predicting the game, so mixed pairs facing men gain more and lose less.
+      var ra = (hc(m.a[0]) + hc(m.a[1])) / 2, rb = (hc(m.b[0]) + hc(m.b[1])) / 2;
       var E = 1 / (1 + Math.pow(10, (rb - ra) / 400));
       var share = m.sa / (m.sa + m.sb);
       var win = m.sa > m.sb ? 1 : (m.sa < m.sb ? 0 : 0.5);
@@ -372,7 +378,9 @@ details.how .rules li{font-size:15.5px}
       m.a.forEach(function(id){ var x = s(id); var K = x.games < 10 ? 32 : 20; R[id] = r(id) + K * (A - E); x.games++; if (win===1) x.wins++; else if (win===0) x.losses++; x.share += share; x.stops[m.stop]=1; });
       m.b.forEach(function(id){ var x = s(id); var K = x.games < 10 ? 32 : 20; R[id] = r(id) + K * ((1-A) - (1-E)); x.games++; if (win===0) x.wins++; else if (win===1) x.losses++; x.share += 1 - share; x.stops[m.stop]=1; });
       var ka = m.a.slice().sort().join("+"), kb = m.b.slice().sort().join("+");
-      var pa = pr(ka), pb = pr(kb), PE = 1 / (1 + Math.pow(10, (pb - pa) / 400));
+      var pa = pr(ka), pb = pr(kb);
+      var la = (lady(m.a[0]) + lady(m.a[1])) * LADY_HANDICAP / 2, lb = (lady(m.b[0]) + lady(m.b[1])) * LADY_HANDICAP / 2;
+      var PE = 1 / (1 + Math.pow(10, ((pb - lb) - (pa - la)) / 400));
       var xa = sp(ka, m.a.slice().sort()), xb = sp(kb, m.b.slice().sort());
       var KA = xa.games < 5 ? 32 : 20, KB = xb.games < 5 ? 32 : 20;
       PR[ka] = pa + KA * (A - PE); PR[kb] = pb + KB * ((1-A) - (1-PE));
@@ -503,6 +511,7 @@ details.how .rules li{font-size:15.5px}
       "Ratings move faster in your first 10 games (up to 32 points per game), then settle (up to 20 per game).",
       "Missing a Tour Stop doesn't cost you anything. Your rating just waits for you.",
       "Men and Women are shown on separate boards but share one rating pool, so mixed games count fully.",
+      "Mixed pairs get a handicap. When the ratings predict a game, each lady counts 200 points lower. So a mixed pair facing two men is expected to score less: they gain more for a win or a close game, and lose less for a defeat. It only changes the prediction, never anyone's actual rating.",
       "Doubles ranks each pair with its own rating, shown once a pair has played 2 games together.",
       "Cup medals (🥇🥈🥉) come from each Tour Stop's cup points and are shown next to your name."
     ].forEach(function(t){ det.appendChild(el("p",{text:t})); });
