@@ -605,7 +605,7 @@ details.how .rules li{font-size:15.5px}
       m.b.forEach(function(id){ var x = t[id]; x.pts += m.sb; x.g++; x.won += m.sb; x.all += m.sa + m.sb; if (m.sb > m.sa) x.w++; });
     });
     var rows = Object.keys(t).map(function(k){ return t[k]; }).sort(function(a,b){ return b.pts - a.pts || b.w - a.w || nameOf(a.id).localeCompare(nameOf(b.id)); });
-    card.appendChild(el("p",{cls:"note", text: done ? (final ? "Final standings. Points are each player's own points added up across their games." : done + " of " + list.length + " games scored. Medals are confirmed once every game is in.") : "Standings appear here as soon as the first score is in."}));
+    card.appendChild(el("p",{cls:"note", text:"Ranked by total points won, then by matches won to break a tie. " + (done ? (final ? "Final standings." : done + " of " + list.length + " games scored. Medals are confirmed once every game is in.") : "Standings appear as soon as the first score is in.")}));
     var md = ["🥇","🥈","🥉"];
     var tb = el("tbody");
     rows.forEach(function(r,i){
