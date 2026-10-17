@@ -6,7 +6,8 @@
  * 2. Deploy → New deployment → Web app, Execute as: Me, Who has access: Anyone.
  * 3. Copy the Web app URL (ends in /exec) into index.html.
  *
- * Tabs: Players, Stops, Matches, ScoreLog, Settings, Rules.
+ * Tabs: Players, Stops, Matches, ScoreLog, Settings, Rules, Comments.
+ * Comments: delete a row in the Comments tab to remove that comment from the website.
  * Running setup again later is safe: it only adds tabs or columns that are missing.
  * PINs live in the Settings tab and are never sent to the website.
  */
@@ -17,7 +18,8 @@ var TABS = {
   Matches: ['id', 'stop', 'cup', 'round', 'time', 'court', 'a1', 'a2', 'b1', 'b2', 'sa', 'sb', 'seq', 'enteredBy', 'updated'],
   ScoreLog: ['time', 'name', 'matchId', 'match', 'oldScore', 'newScore'],
   Settings: ['key', 'value', 'note'],
-  Rules: ['rule']
+  Rules: ['rule'],
+  Comments: ['id', 'article', 'time', 'name', 'text']
 };
 
 var DEFAULT_RULES = [
@@ -154,6 +156,7 @@ function doPost(e) {
 function handle(req) {
   switch (req.action) {
     case 'score': return saveScore(req);
+    case 'comment': return addComment(req);
     case 'checkScorePin': return checkPin('ScorePIN', req.pin) ? { ok: true } : { ok: false, error: "That Score PIN didn't work." };
     case 'checkAdmin': return admin(req) || { ok: true };
     case 'addPlayer': return admin(req) || addPlayer(req);
@@ -193,6 +196,18 @@ function saveScore(req) {
   var desc = m.cup + ' R' + m.round + ' C' + m.court + ': ' + names(m.a1) + '/' + names(m.a2) + ' v ' + names(m.b1) + '/' + names(m.b2);
   sheet('ScoreLog').appendRow([now, name, m.id, desc, oldScore, newScore]);
   return { ok: true, match: m };
+}
+
+function addComment(req) {
+  var name = cleanText(req.name, 40);
+  if (!name) return { ok: false, error: 'Type your name first.' };
+  if (!checkPin('ScorePIN', req.pin)) return { ok: false, error: "That Score PIN didn't work.", badPin: true };
+  var article = cleanText(req.article, 60), text = cleanText(req.text, 500);
+  if (!article) return { ok: false, error: 'Bad request.' };
+  if (!text) return { ok: false, error: 'Write something first.' };
+  var c = { id: 'c-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), article: article, time: new Date().toISOString(), name: name, text: text };
+  ensureTab('Comments').appendRow([c.id, c.article, c.time, c.name, c.text]);
+  return { ok: true, comment: c };
 }
 
 function addPlayer(req) {
@@ -261,7 +276,9 @@ function readAll() {
   });
   var ruleTab = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Rules');
   var rules = ruleTab ? rows('Rules').map(function (r) { return r.rule; }).filter(String) : null;
-  return { ok: true, players: players, stops: stops, matches: matches, rules: rules };
+  ensureTab('Comments');
+  var comments = rows('Comments').map(function (c) { return { id: c.id, article: c.article, time: c.time, name: c.name, text: c.text.replace(/^'(?=[=+\-@])/, '') }; });
+  return { ok: true, players: players, stops: stops, matches: matches, rules: rules, comments: comments };
 }
 
 function rows(tab) {
@@ -279,6 +296,17 @@ function rows(tab) {
       });
       return o;
     });
+}
+
+// Adds a tab with its header row if it doesn't exist yet, so new features work without running setup again.
+function ensureTab(name) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet(), sh = ss.getSheetByName(name);
+  if (sh) return sh;
+  sh = ss.insertSheet(name);
+  sh.getRange(1, 1, 1, TABS[name].length).setValues([TABS[name]]).setFontWeight('bold');
+  sh.setFrozenRows(1);
+  sh.getRange(1, 1, sh.getMaxRows(), TABS[name].length).setNumberFormat('@');
+  return sh;
 }
 
 function sheet(name) {

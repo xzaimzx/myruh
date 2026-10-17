@@ -177,6 +177,15 @@ details.how .rules li{font-size:15.5px}
 .story figcaption{font-size:13px;color:var(--muted);margin-top:4px;text-align:center}
 .story .facts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
 .story .facts div{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 6px;text-align:center;font-size:12.5px;color:var(--muted)}
+.comments{border-top:1px solid var(--line);padding:14px 16px 16px}
+.comments h3{margin:0 0 10px;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:21px}
+.cmt{padding:9px 0;border-bottom:1px solid var(--line)}
+.cmt:last-of-type{border-bottom:0}
+.cmt .by{font-weight:600}
+.cmt .when{font-size:12.5px;color:var(--muted);margin-left:6px}
+.cmt p{margin:3px 0 0;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
+.comments textarea{width:100%;min-height:76px;border:1.5px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:16px/1.45 "Barlow",system-ui,sans-serif;padding:9px 10px;resize:vertical;margin-top:10px;box-sizing:border-box}
+.comments .row2{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;font-size:13.5px;color:var(--muted)}
 .story .facts b{display:block;font-family:Anton,sans-serif;font-weight:400;font-size:24px;color:var(--ink)}
 [hidden]{display:none!important}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
@@ -226,8 +235,8 @@ details.how .rules li{font-size:15.5px}
 <!-- Name + Score PIN -->
 <div class="sheet" id="whoSheet" role="dialog" aria-modal="true" aria-labelledby="whoTitle">
   <div class="panel">
-    <h3 id="whoTitle">Who's entering scores?</h3>
-    <p>Your name is saved with every score you enter. Ask the organiser for this week's Score PIN.</p>
+    <h3 id="whoTitle">Who are you?</h3>
+    <p>Your name is saved with every score and comment you post. Ask the organiser for this week's Score PIN.</p>
     <div class="field"><label for="whoName">Your name</label><input id="whoName" type="text" autocomplete="name" maxlength="40"></div>
     <div class="field"><label for="whoPin">Score PIN</label><input id="whoPin" type="text" inputmode="numeric" autocomplete="off" maxlength="12"></div>
     <div class="msg" id="whoMsg"></div>
@@ -254,7 +263,7 @@ details.how .rules li{font-size:15.5px}
 
 <script>
 (function(){
-  var S = {players:{}, stops:{}, matches:{}, rules:null, state:"loading", error:"", loadedAt:null};
+  var S = {players:{}, stops:{}, matches:{}, rules:null, comments:null, state:"loading", error:"", loadedAt:null};
   var DEFAULT_RULES = [
     "Every game is 21 points in total (e.g. 12–9). No draws.",
     "Serve rotates every 4 points.",
@@ -265,7 +274,7 @@ details.how .rules li{font-size:15.5px}
     "At 10–10, if there's a lady in the match, men can't serve to her.",
     "Highest points wins each cup. Top 3 in each cup get gold, silver and bronze medals."
   ];
-  var UI = {tab:"rank", board:"M", allPairs:false, stop:null, pendingRender:false};
+  var UI = {tab:"rank", board:"M", allPairs:false, stop:null, pendingRender:false, drafts:{}, sent:{}, posting:{}, cmtMsg:{}};
   var pending = {};          // matchId -> {sa, sb} not yet confirmed by the sheet
   var status = {};           // matchId -> "Saving…" / error text
   var who = {name:"", pin:""};
@@ -322,6 +331,7 @@ details.how .rules li{font-size:15.5px}
     });
     S.players = P; S.stops = St; S.matches = M;
     S.rules = (data.rules && data.rules.length) ? data.rules : null;
+    S.comments = data.comments || null;   // null until the sheet script supports comments
   }
   function load(quiet){
     if (!configured) return Promise.resolve();
@@ -422,7 +432,7 @@ details.how .rules li{font-size:15.5px}
   /* ---------- Render ---------- */
   function render(){
     var a = document.activeElement;
-    if (a && a.closest && a.closest("#main") && (a.tagName === "INPUT" || a.tagName === "SELECT")) { UI.pendingRender = true; return; }
+    if (a && a.closest && a.closest("#main") && (a.tagName === "INPUT" || a.tagName === "SELECT" || a.tagName === "TEXTAREA")) { UI.pendingRender = true; return; }
     UI.pendingRender = false;
     var cs = currentStop(); document.getElementById("curTab").textContent = cs ? cs.name : "Tour Stop";
     document.querySelectorAll("nav.tabs button").forEach(function(b){ b.setAttribute("aria-selected", b.dataset.tab === UI.tab ? "true" : "false"); });
@@ -552,6 +562,7 @@ details.how .rules li{font-size:15.5px}
 
   // Tour News stories, newest first. Photos live in img/news/.
   var NEWS = [{
+    id: "stop1-results",
     kicker: "Tour Stop 1 · Sat 17 Oct 2026 · Padel In Ar Rabwah",
     title: "Fakri and Du crowned on a big opening day",
     hero: "img/news/stop1-group.webp", heroAlt: "All the Tour Stop 1 players lined up at the net with their racquets",
@@ -587,7 +598,59 @@ details.how .rules li{font-size:15.5px}
         body.appendChild(el("h3",{text:sec[0]}));
         sec[1].forEach(function(t){ body.appendChild(el("p",{text:t})); });
       });
-      main.appendChild(el("article",{cls:"story"},[el("img",{src:n.hero, alt:n.heroAlt}), body]));
+      main.appendChild(el("article",{cls:"story"},[el("img",{src:n.hero, alt:n.heroAlt}), body, commentsBox(n.id)]));
+    });
+  }
+
+  // Comments are saved in the sheet's Comments tab. Posting needs a name and the weekly Score PIN.
+  function ago(iso){
+    var t = new Date(iso); if (isNaN(t)) return "";
+    var m = Math.round((Date.now() - t) / 60000);
+    if (m < 1) return "just now"; if (m < 60) return m + " min ago";
+    var h = Math.round(m / 60); if (h < 24) return h + (h === 1 ? " hour ago" : " hours ago");
+    return t.toLocaleDateString(undefined,{day:"numeric", month:"short"});
+  }
+  function commentsBox(article){
+    var box = el("section",{cls:"comments", "aria-label":"Comments"});
+    if (!configured || S.state === "loading"){ box.appendChild(el("h3",{text:"Comments"})); box.appendChild(el("p",{cls:"note", text: S.state === "loading" ? "Loading comments…" : "Comments aren't available yet."})); return box; }
+    if (S.state === "error"){ box.appendChild(el("h3",{text:"Comments"})); box.appendChild(el("p",{cls:"note", text:"Couldn't load comments. Check your connection."})); return box; }
+    if (!S.comments){ box.appendChild(el("h3",{text:"Comments"})); box.appendChild(el("p",{cls:"note", text:"Comments open once the organiser updates the sheet."})); return box; }
+    var list = S.comments.filter(function(c){ return c.article === article; });
+    var mine = (UI.sent[article] || []).filter(function(x){ return !list.some(function(c){ return c.id === x.id; }); });
+    list = list.concat(mine);
+    box.appendChild(el("h3",{text:"Comments" + (list.length ? " (" + list.length + ")" : "")}));
+    if (!list.length) box.appendChild(el("p",{cls:"note", text:"No comments yet. Be the first."}));
+    list.forEach(function(c){
+      box.appendChild(el("div",{cls:"cmt"},[el("span",{cls:"by", text:c.name}), el("span",{cls:"when", text:ago(c.time)}), el("p",{text:c.text})]));
+    });
+    var ta = el("textarea",{maxlength:"500", placeholder:"Write a comment…", "aria-label":"Write a comment"});
+    ta.value = UI.drafts[article] || "";
+    ta.addEventListener("input", function(){ UI.drafts[article] = ta.value; });
+    ta.addEventListener("blur", function(){ if (UI.pendingRender) setTimeout(render, 0); });
+    var msg = el("div",{cls:"msg", role:"status"}); if (UI.cmtMsg[article]) msg.textContent = UI.cmtMsg[article];
+    var btn = el("button",{cls:"btn primary", text: UI.posting[article] ? "Posting…" : "Post", disabled: !!UI.posting[article], onclick:function(){ postComment(article); }});
+    var as = el("span",{}, who.name ? ["Posting as " + who.name + " · ", el("button",{cls:"linkbtn", text:"Change", onclick:function(){ openWho(null); }})] : ["You'll be asked for your name and the Score PIN."]);
+    box.appendChild(ta); box.appendChild(el("div",{cls:"row2"},[as, btn])); box.appendChild(msg);
+    return box;
+  }
+  function postComment(article){
+    var text = (UI.drafts[article] || "").trim();
+    if (!text){ UI.cmtMsg[article] = "Write something first."; render(); return; }
+    if (!who.name || !who.pin){ queued = function(){ postComment(article); }; openWho(null); return; }
+    UI.posting[article] = true; UI.cmtMsg[article] = ""; render();
+    post({action:"comment", name:who.name, pin:who.pin, article:article, text:text}).then(function(res){
+      UI.posting[article] = false;
+      if (res.ok){
+        UI.drafts[article] = "";
+        if (res.comment) (UI.sent[article] = UI.sent[article] || []).push(res.comment);
+        render(); load(true);
+      } else if (res.badPin){
+        who.pin = ""; lsSet("mt-who", JSON.stringify(who));
+        queued = function(){ postComment(article); };
+        render(); openWho(res.error + " Check this week's PIN with the organiser.");
+      } else {
+        UI.cmtMsg[article] = "Not posted: " + (res.error || "try again"); render();
+      }
     });
   }
 
@@ -958,7 +1021,7 @@ details.how .rules li{font-size:15.5px}
       who = {name:n, pin:p}; lsSet("mt-who", JSON.stringify(who));
       closeSheet("whoSheet");
       var q = queued; queued = null;
-      if (q) submitScore(q.id, q.next); else render();
+      if (typeof q === "function") q(); else if (q) submitScore(q.id, q.next); else render();
     });
   });
   whoPin.addEventListener("keydown", function(e){ if (e.key === "Enter") whoSave.click(); });
