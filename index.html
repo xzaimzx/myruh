@@ -142,6 +142,14 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
 .sheet p{margin:0 0 12px;font-size:14.5px;color:var(--muted)}
 .sheet textarea{width:100%;height:46vh;height:46dvh;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:16px/1.45 "Barlow",system-ui,sans-serif;padding:10px;resize:none;-webkit-user-select:text;user-select:text}
 .rest{font-weight:500;color:var(--muted)}
+.lb .seg{margin-top:0}
+.lbt th{font-size:12.5px;font-weight:600;color:var(--muted);text-align:left;padding:4px;border-bottom:1px solid var(--line)}
+.lbt th:last-child{text-align:right}
+.lbt td.rk{width:34px;text-align:center;font-family:Anton,sans-serif;font-size:18px;color:var(--muted)}
+.lbt tr.podium td.rk{font-size:20px}
+.lbt td b{font-family:"Barlow Condensed",sans-serif;font-size:19px}
+.lbt td .sub{font-size:12.5px;color:var(--muted)}
+.lbt td.pts{font-family:Anton,sans-serif;font-size:22px;text-align:right}
 details.how summary{cursor:pointer;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:21px;list-style-position:inside}
 details.how p{margin:10px 0 0;font-size:15px}
 details.how .rules li{font-size:15.5px}
@@ -547,6 +555,7 @@ details.how .rules li{font-size:15.5px}
     var cups = []; var byCup = {};
     ms.forEach(function(m){ var c = m.cup || "Cup"; if (!byCup[c]){ byCup[c] = []; cups.push(c); } byCup[c].push(m); });
     if (!ms.length) main.appendChild(el("div",{cls:"empty", text: isAdmin() ? "No matches yet. Add them below." : "No matches yet."}));
+    if (cups.length) main.appendChild(leaderboard(stop, cups, byCup));
     if (cups.length){
       var lu = el("div",{cls:"card"},[el("h3",{text:"Players at this Tour Stop"})]);
       cups.forEach(function(c){
@@ -570,14 +579,6 @@ details.how .rules li{font-size:15.5px}
         }
         main.appendChild(matchCard(m, stop));
       });
-      var tbl = cupTable(list);
-      if (tbl.length){
-        var det = el("details",{style:"margin:8px 0 4px"});
-        det.appendChild(el("summary",{text:"Standings for " + c, style:"cursor:pointer;font-weight:600;font-size:15px;padding:6px 2px"}));
-        var t = el("table",{cls:"standings"}); var tb = el("tbody");
-        tbl.forEach(function(row,i){ tb.appendChild(el("tr",null,[el("td",{text:String(i+1)}), el("td",{text:nameOf(row.id) + "  (" + row.w + "W/" + row.g + "P)"}), el("td",{text:String(row.pts)})])); });
-        t.appendChild(tb); det.appendChild(t); main.appendChild(det);
-      }
     });
     if (isAdmin()) main.appendChild(addMatchForm(stop, cups, ms));
     if (ms.length){
@@ -588,6 +589,37 @@ details.how .rules li{font-size:15.5px}
       var sh = el("button",{cls:"btn ghost wide", text:"Share " + stop.name + " standings", onclick:function(){ openShare(stopText(stop, cups, byCup)); }});
       sh.style.marginTop = "12px"; main.appendChild(sh);
     }
+  }
+
+  function leaderboard(stop, cups, byCup){
+    if (cups.indexOf(UI.cup) < 0) UI.cup = cups[0];
+    var card = el("div",{cls:"card lb"},[el("h3",{text:stop.name + " Leaderboard"})]);
+    var seg = el("div",{cls:"seg", role:"group", "aria-label":"Cup"});
+    cups.forEach(function(c){ seg.appendChild(el("button",{text:c.replace(/ Cup$/,""), "aria-pressed": UI.cup === c ? "true" : "false", onclick:function(){ UI.cup = c; render(); }})); });
+    card.appendChild(seg);
+    var list = byCup[UI.cup], done = list.filter(scored).length, final = done === list.length;
+    var t = {};
+    list.forEach(function(m){ m.a.concat(m.b).forEach(function(id){ t[id] = t[id] || {id:id, pts:0, w:0, g:0, won:0, all:0}; }); });
+    list.forEach(function(m){ if (!scored(m)) return;
+      m.a.forEach(function(id){ var x = t[id]; x.pts += m.sa; x.g++; x.won += m.sa; x.all += m.sa + m.sb; if (m.sa > m.sb) x.w++; });
+      m.b.forEach(function(id){ var x = t[id]; x.pts += m.sb; x.g++; x.won += m.sb; x.all += m.sa + m.sb; if (m.sb > m.sa) x.w++; });
+    });
+    var rows = Object.keys(t).map(function(k){ return t[k]; }).sort(function(a,b){ return b.pts - a.pts || b.w - a.w || nameOf(a.id).localeCompare(nameOf(b.id)); });
+    card.appendChild(el("p",{cls:"note", text: done ? (final ? "Final standings. Points are each player's own points added up across their games." : done + " of " + list.length + " games scored. Medals are confirmed once every game is in.") : "Standings appear here as soon as the first score is in."}));
+    var md = ["🥇","🥈","🥉"];
+    var tb = el("tbody");
+    rows.forEach(function(r,i){
+      var rk = done && i < 3 ? md[i] : String(i+1);
+      tb.appendChild(el("tr",{cls: done && i < 3 ? "podium" : null},[
+        el("td",{cls:"rk", text:rk}),
+        el("td",null,[el("b",{text:nameOf(r.id)}), el("div",{cls:"sub", text: r.g ? (r.w + "W from " + r.g + (r.g === 1 ? " game" : " games") + "  ·  " + Math.round(r.won / r.all * 100) + "% of points") : "No games yet"})]),
+        el("td",{cls:"pts", text:String(r.pts)})
+      ]));
+    });
+    var tbl = el("table",{cls:"standings lbt"},[el("thead",null,[el("tr",null,[el("th",{text:"#"}), el("th",{text:"Player"}), el("th",{text:"Pts"})])]), tb]);
+    card.appendChild(tbl);
+    if (done) card.appendChild(el("button",{cls:"btn ghost wide", text:"Share leaderboard", style:"margin-top:12px", onclick:function(){ openShare(stopText(stop, cups, byCup)); }}));
+    return card;
   }
 
   function resting(list, round){
