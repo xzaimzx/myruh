@@ -205,6 +205,7 @@ details.how .rules li{font-size:15.5px}
 .newp{display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center}
 .newp input,.newp select{border:1.5px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:16px "Barlow",system-ui,sans-serif;padding:8px 9px;min-width:0}
 .warn{background:var(--bg);border:1.5px solid var(--red);border-radius:10px;padding:10px;margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.warntext{color:var(--red);font-weight:600}
 .warn p{margin:0 0 4px;width:100%;font-size:14px}
 .pairs{display:grid;gap:6px;margin:6px 0}
 .pairrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
@@ -348,11 +349,11 @@ details.how .rules li{font-size:15.5px}
   /* ---------- Levels and formats (the Court Captains menu) ---------- */
   var LEVELS = {
     social: {label:"Social", value:0.5, pct:"50%", icon:"🔄", blurb:"Partners rotate. Americano or Mexicano."},
-    team:   {label:"Team", value:0.75, pct:"75%", icon:"🤝", blurb:"Same partner all event, scored in points."},
+    team:   {label:"Team", value:0.75, pct:"75%", icon:"🤝", blurb:"Same partner all event. Americano or Mexicano, scored in points."},
     match:  {label:"Match", value:1, pct:"100%", icon:"🎾", blurb:"Same partner, real padel scoring. Short (6 games) or full sets."},
     major:  {label:"Major", value:1.5, pct:"150%", icon:"🏆", blurb:"Special events run by the organiser."}
   };
-  var LEVEL_FORMATS = {social:["americano","mexicano"], team:["team"], match:["short","full"], major:["americano","mexicano","team","short","full"]};
+  var LEVEL_FORMATS = {social:["americano","mexicano"], team:["team","mexicano"], match:["short","full"], major:["americano","mexicano","team","short","full"]};
   var FORMATS = {
     americano: {label:"Americano", points:true, pairs:false, hint:"Partners change every round. The website picks partners so nobody plays with the same person twice if it can help it. You can also keep a pair together, like a mixed couple, while everyone else rotates."},
     mexicano:  {label:"Mexicano", points:true, pairs:false, hint:"Round 1 is set by ranking. After each round you tap Make next round, and each court pairs 1st and 4th against 2nd and 3rd on the day's standings."},
@@ -360,12 +361,25 @@ details.how .rules li{font-size:15.5px}
     short:     {label:"Short match", points:false, pairs:true, hint:"Fixed pairs. Exactly 6 games, golden point, tiebreak at 3–3. Every pair plays every other pair."},
     full:      {label:"Full sets", points:false, pairs:true, hint:"Fixed pairs. Normal padel sets, 1 set or best of 3. Every pair plays every other pair."}
   };
+  // In a Team event partners never change, so the two choices are named after how pairs meet: everyone (Americano) or by standings (Mexicano).
+  function fmtLabel(level, f){ return f === "team" ? (level === "team" ? "Americano" : "Team") : FORMATS[f].label; }
+  function fmtHint(level, f){
+    if (level === "team" && f === "team") return "Same partner all event. Every pair plays every other pair.";
+    if (level === "team" && f === "mexicano") return "Same partner all event. Round 1 is set by ranking. After each round you tap Make next round, and pairs meet by the day's standings: 1st v 2nd, 3rd v 4th.";
+    return FORMATS[f].hint;
+  }
+  function allPairs(mk){ return FORMATS[mk.format].pairs || mk.level === "team"; }
+  function makePairs(ids, split, random){
+    var mk2 = function(g){ if (!random) return balancedPairs(g); var s = shuffle(g.slice()), out = []; for (var i = 0; i + 1 < s.length; i += 2) out.push([s[i], s[i+1]]); return out; };
+    if (!split) return mk2(ids);
+    return mk2(ids.filter(function(id){ return S.players[id].gender !== "F"; })).concat(mk2(ids.filter(function(id){ return S.players[id].gender === "F"; })));
+  }
   function levelValue(stop){ var l = stop && LEVELS[stop.level]; return l ? l.value : 1; }
   function isGames(stop){ return !!stop && (stop.format === "short" || stop.format === "full"); }
   function levelLine(stop){
     if (!stop.level || !LEVELS[stop.level]) return "🎉 Season Opener  ·  counts 100%";
     var l = LEVELS[stop.level], f = FORMATS[stop.format];
-    return l.icon + " " + l.label + (f && f.label !== l.label ? " · " + f.label : "") + "  ·  counts " + l.pct;
+    return l.icon + " " + l.label + (f && fmtLabel(stop.level, stop.format) !== l.label ? " · " + fmtLabel(stop.level, stop.format) : "") + "  ·  counts " + l.pct;
   }
   // 1 if side A won, 0 if side B won. Full-set matches are won on sets, everything else on the score.
   function winOf(m){
@@ -871,8 +885,12 @@ details.how .rules li{font-size:15.5px}
     if (!f || !FORMATS[f]) return base;
     var out = [];
     if (f === "americano") out.push("Partners change every round, as shown in the schedule.");
-    if (f === "mexicano") out.push("Round 1 is set by ranking. After that, each court pairs 1st and 4th against 2nd and 3rd on the day's standings.");
-    if (f === "team") out.push("Keep the same partner all event. Every pair plays every other pair.");
+    var su = stop.setup || {}, team = stop.level === "team";
+    if (su.split) out.push("Men play men and ladies play ladies, on their own courts.");
+    if (team) out.push("Keep the same partner all event.");
+    else if (su.fixed && su.fixed.length && f !== "team" && FORMATS[f] && !FORMATS[f].pairs) out.push("These pairs stay together all event: " + su.fixed.map(function(pr){ return nameOf(pr[0]) + " & " + nameOf(pr[1]); }).join(", ") + ". Everyone else changes partner.");
+    if (f === "mexicano") out.push(team ? "Round 1 is set by ranking. After that, pairs meet by the day's standings: 1st v 2nd, 3rd v 4th." : "Round 1 is set by ranking. After that, each court pairs 1st and 4th against 2nd and 3rd on the day's standings.");
+    if (f === "team") out.push((team ? "" : "Keep the same partner all event. ") + "Every pair plays every other pair.");
     if (f === "short") out = out.concat(["Keep the same partner all event.", "Play exactly 6 games, so scores can be 6–0, 5–1, 4–2 or 3–3.", "Golden point at deuce: the receiving pair picks the side.", "At 3–3, play a tiebreak to 7 points and enter it as 4–3."]);
     if (f === "full") out = out.concat(["Keep the same partner all event.", "Normal padel sets, 1 set or best of 3, as the Court Captain announced.", "Enter the sets, like 6-4 or 6-4 3-6 7-5."]);
     if (FORMATS[f].points) base.forEach(function(r){
@@ -1160,20 +1178,65 @@ details.how .rules li{font-size:15.5px}
     }
     return out;
   }
-  // Mexicano: whoever has played least plays next; courts are filled from the day's standings, 1st + 4th v 2nd + 3rd.
-  function mexicanoRound(players, courts, round, ms){
-    var k = Math.min(courts, Math.floor(players.length / 4)), t = {};
+  // Mexicano: whoever has played least plays next; courts are filled from the day's standings.
+  // Four rotating players play 1st + 4th v 2nd + 3rd. Pairs that stay together play as one team.
+  function mexicanoRound(players, courts, round, ms, fixed){
+    var t = {}, inF = {};
     players.forEach(function(p){ t[p] = {pts:0, g:0}; });
     ms.forEach(function(m){ if (!scored(m)) return;
       m.a.forEach(function(id){ if (t[id]){ t[id].pts += m.sa; t[id].g++; } });
       m.b.forEach(function(id){ if (t[id]){ t[id].pts += m.sb; t[id].g++; } });
     });
     var avg = function(p){ return t[p].g ? t[p].pts / t[p].g : 0; };
-    var play = shuffle(players.slice()).sort(function(a,b){ return t[a].g - t[b].g; }).slice(0, 4 * k)
-      .sort(function(a,b){ return avg(b) - avg(a) || rating(b) - rating(a); });
+    var str = function(u){ return u.reduce(function(x, p){ return x + avg(p); }, 0) / u.length; };
+    var rt = function(u){ return u.reduce(function(x, p){ return x + rating(p); }, 0) / u.length; };
+    (fixed || []).forEach(function(pr){ if (t[pr[0]] && t[pr[1]]) inF[pr[0]] = inF[pr[1]] = 1; });
+    var units = (fixed || []).filter(function(pr){ return t[pr[0]] && t[pr[1]]; }).map(function(pr){ return pr.slice(); })
+      .concat(players.filter(function(p){ return !inF[p]; }).map(function(p){ return [p]; }));
+    var k = Math.min(courts, Math.floor(players.length / 4)), play = null;
+    while (k > 0 && !play){
+      var need = 4 * k, sel = [], n = 0;
+      shuffle(units.slice()).sort(function(a,b){ return t[a[0]].g - t[b[0]].g; }).forEach(function(u){ if (n + u.length <= need){ sel.push(u); n += u.length; } });
+      if (n === need) play = sel; else k--;
+    }
+    if (!play) return [];
+    play.sort(function(a,b){ return str(b) - str(a) || rt(b) - rt(a); });
     var out = [];
-    for (var g = 0; g < k; g++){ var q = play.slice(g * 4, g * 4 + 4); out.push({round:round, court:g + 1, a:[q[0],q[3]], b:[q[1],q[2]]}); }
+    for (var g = 0; g < k; g++){
+      var grp = [], size = 0;
+      for (var i = 0; i < play.length && size < 4; i++){ if (size + play[i].length <= 4){ grp.push(play[i]); size += play[i].length; play.splice(i--, 1); } }
+      var prs = grp.filter(function(u){ return u.length === 2; }), sg = grp.filter(function(u){ return u.length === 1; }).map(function(u){ return u[0]; });
+      var a, b;
+      if (prs.length === 2){ a = prs[0]; b = prs[1]; }
+      else if (prs.length === 1){ a = prs[0]; b = sg; }
+      else { a = [sg[0], sg[3]]; b = [sg[1], sg[2]]; }
+      out.push({round:round, court:g + 1, a:a, b:b});
+    }
     return out;
+  }
+  // Splits the players into groups that play apart (men and ladies) and shares out the courts between them.
+  function playGroups(ids, split, courts, cup){
+    if (!split) return [{cup:cup, ids:ids, courts:courts}];
+    var men = ids.filter(function(id){ return S.players[id] && S.players[id].gender !== "F"; }), ladies = ids.filter(function(id){ return S.players[id] && S.players[id].gender === "F"; });
+    var gs = [{cup:"Men", ids:men, courts:1}, {cup:"Ladies", ids:ladies, courts:1}];
+    for (var c = 2; c < courts; c++){
+      var g = gs.slice().sort(function(x, y){ return y.ids.length / y.courts - x.ids.length / x.courts; })[0];
+      if (Math.floor(g.ids.length / 4) > g.courts) g.courts++;
+    }
+    return gs;
+  }
+  function splitProblem(ids, courts){
+    var gs = playGroups(ids, true, courts, "");
+    if (courts < 2) return "Splitting men and ladies needs at least 2 courts, so both groups can play at the same time.";
+    var small = gs.filter(function(g){ return g.ids.length < 4; })[0];
+    if (small) return "Splitting needs at least 4 " + (small.cup === "Men" ? "men" : "ladies") + ". Play together instead, or pick more players.";
+    return "";
+  }
+  // Puts each group's games side by side, so the ladies' courts come after the men's.
+  function mergeGroups(lists){
+    var out = [], off = 0;
+    lists.forEach(function(l){ var mx = 0; l.list.forEach(function(m){ out.push({round:m.round, court:m.court + off, a:m.a, b:m.b, cup:l.cup}); mx = Math.max(mx, m.court); }); off += l.courts; });
+    return out.sort(function(x, y){ return x.round - y.round || x.court - y.court; });
   }
   // Fixed pairs: every pair plays every other pair (circle method), split into rounds by the number of courts.
   function roundRobin(pairs, courts){
@@ -1201,10 +1264,12 @@ details.how .rules li{font-size:15.5px}
     var msg = el("div",{cls:"msg"});
     var btn = el("button",{cls:"btn primary wide", text:"Make round " + (last + 1), disabled: !ready, onclick:function(){
       UI.mkC = null; var players = (stop.players || []).filter(function(id){ return S.players[id]; });
-      var list = mexicanoRound(players, stop.courts || 1, last + 1, ms);
-      var lastTime = ms.filter(function(m){ return m.round === last; })[0];
+      var su = stop.setup || {split:false, fixed:[]};
+      var list = mergeGroups(playGroups(players, su.split, stop.courts || 1, ms[0] ? ms[0].cup : "Mexicano").map(function(g){
+        return {cup:g.cup, courts:g.courts, list:mexicanoRound(g.ids, g.courts, last + 1, ms, su.fixed)};
+      }));
       btn.disabled = true; btn.textContent = "Making round " + (last + 1) + "…";
-      hostPost({action:"addRound", stop:stop.id, round:last + 1, matches:list.map(function(m){ return {round:m.round, court:m.court, time:"", cup:ms[0] ? ms[0].cup : "Mexicano", a1:m.a[0], a2:m.a[1], b1:m.b[0], b2:m.b[1]}; })}).then(function(res){
+      hostPost({action:"addRound", stop:stop.id, round:last + 1, matches:list.map(function(m){ return {round:m.round, court:m.court, time:"", cup:m.cup, a1:m.a[0], a2:m.a[1], b1:m.b[0], b2:m.b[1]}; })}).then(function(res){
         if (res.ok) load(); else { btn.disabled = false; btn.textContent = "Make round " + (last + 1); msg.textContent = res.error; }
       });
     }});
@@ -1305,23 +1370,10 @@ details.how .rules li{font-size:15.5px}
     function changed(){ mk.sched = null; mk.msg = ""; }
     function field(label, input, note){ var f = el("div",{cls:"field"},[el("label",{text:label}), input]); if (note) f.appendChild(el("p",{cls:"note", text:note})); return f; }
 
-    // 1. Level and format
-    card.appendChild(el("div",{cls:"step", text:"1. Pick a level"}));
-    var seg = el("div",{cls:"seg", role:"group", "aria-label":"Level"});
-    ["social","team","match"].concat(isAdmin() ? ["major"] : []).forEach(function(k){
-      seg.appendChild(el("button",{text:LEVELS[k].label + " " + LEVELS[k].pct, "aria-pressed": mk.level === k ? "true" : "false", onclick:function(){ mk.level = k; if (LEVEL_FORMATS[k].indexOf(mk.format) < 0) mk.format = LEVEL_FORMATS[k][0]; mk.pairs = null; changed(); commit(); }}));
-    });
-    card.appendChild(seg);
-    var fs = LEVEL_FORMATS[mk.level];
-    if (fs.length > 1){
-      var fseg = el("div",{cls:"seg", role:"group", "aria-label":"Format"});
-      fs.forEach(function(f){ fseg.appendChild(el("button",{text:FORMATS[f].label, "aria-pressed": mk.format === f ? "true" : "false", onclick:function(){ mk.format = f; mk.pairs = null; changed(); commit(); }})); });
-      card.appendChild(fseg);
-    }
-    card.appendChild(el("p",{cls:"note", text:FORMATS[mk.format].hint}));
+    var n = 0; function step(t){ card.appendChild(el("div",{cls:"step", text:(++n) + ". " + t})); }
 
     // 2. Where and when
-    card.appendChild(el("div",{cls:"step", text:"2. Where and when"}));
+    step("Where and when");
     var vn = el("input",{type:"text", placeholder:"e.g. Padel In Ar Rabwah", value:mk.venue});
     var pl = el("input",{type:"text", placeholder:"e.g. Ar Rabwah", value:mk.place});
     var nm = el("input",{type:"text", value: mk.nameEdited ? mk.name : eventName(mk)});
@@ -1338,20 +1390,35 @@ details.how .rules li{font-size:15.5px}
     card.appendChild(el("div",{cls:"grid2"},[field("Court starts", st), field("Court ends", en)]));
     var ct = el("select"); [1,2,3,4].forEach(function(n){ ct.appendChild(el("option",{value:String(n), text:n + (n === 1 ? " court" : " courts"), selected: mk.courts === n ? "selected" : null})); });
     ct.addEventListener("change", function(){ mk.courts = +ct.value; changed(); commit(); });
-    var row = [field("Courts", ct)];
+    card.appendChild(el("div",{cls:"grid2"},[field("Courts", ct)]));
+
+    // 1. Level and format
+    step("Pick a level and format");
+    var seg = el("div",{cls:"seg", role:"group", "aria-label":"Level"});
+    ["social","team","match"].concat(isAdmin() ? ["major"] : []).forEach(function(k){
+      seg.appendChild(el("button",{text:LEVELS[k].label + " " + LEVELS[k].pct, "aria-pressed": mk.level === k ? "true" : "false", onclick:function(){ mk.level = k; if (LEVEL_FORMATS[k].indexOf(mk.format) < 0) mk.format = LEVEL_FORMATS[k][0]; mk.pairs = null; changed(); commit(); }}));
+    });
+    card.appendChild(seg);
+    var fs = LEVEL_FORMATS[mk.level];
+    if (fs.length > 1){
+      var fseg = el("div",{cls:"seg", role:"group", "aria-label":"Format"});
+      fs.forEach(function(f){ fseg.appendChild(el("button",{text:fmtLabel(mk.level, f), "aria-pressed": mk.format === f ? "true" : "false", onclick:function(){ mk.format = f; mk.pairs = null; changed(); commit(); }})); });
+      card.appendChild(fseg);
+    }
+    card.appendChild(el("p",{cls:"note", text:fmtHint(mk.level, mk.format)}));
+
     if (FORMATS[mk.format].points){
       var tt = el("select"); [21,24,32].forEach(function(n){ tt.appendChild(el("option",{value:String(n), text:n + " points", selected: mk.total === n ? "selected" : null})); });
       tt.addEventListener("change", function(){ mk.total = +tt.value; changed(); commit(); });
-      row.push(field("Points per game", tt));
+      card.appendChild(field("Points per game", tt));
     }
-    card.appendChild(el("div",{cls:"grid2"}, row));
     var fit = fitRounds(mk);
     card.appendChild(el("p",{cls:"note", text: fit ? "A round takes about " + roundMins(mk) + " minutes, so " + fit + (fit === 1 ? " round fits" : " rounds fit") + " in your court time. The schedule is worked out from the players you pick below." : "Add the court start and end times, and the website works out how many rounds fit. You can fill this in on the day, once you know who's playing."}));
 
     // 3. Players
     var picked = mk.players.filter(function(id){ return S.players[id]; });
     var men = picked.filter(function(id){ return S.players[id].gender !== "F"; }).length;
-    card.appendChild(el("div",{cls:"step", text:"3. Players (" + picked.length + " picked: " + men + " men, " + (picked.length - men) + " ladies)"}));
+    step("Players (" + picked.length + " picked: " + men + " men, " + (picked.length - men) + " ladies)");
     var q = el("input",{type:"search", placeholder:"Search players", "aria-label":"Search players"});
     var list = el("div",{cls:"pick"});
     var ps = Object.keys(S.players).map(function(k){ return S.players[k]; }).sort(function(a,b){ return a.name.localeCompare(b.name); });
@@ -1391,15 +1458,28 @@ details.how .rules li{font-size:15.5px}
     }
     card.appendChild(nmsg);
 
+    // Men and ladies: play together, or split into two groups that play apart
+    var mixed = mk.level !== "match" && men > 0 && men < picked.length;
+    if (!mixed) mk.split = false;
+    if (mixed){
+      step("Men and ladies");
+      var sseg = el("div",{cls:"seg", role:"group", "aria-label":"Men and ladies"});
+      [[false,"Play together"],[true,"Split men and ladies"]].forEach(function(o){ sseg.appendChild(el("button",{text:o[1], "aria-pressed": !!mk.split === o[0] ? "true" : "false", onclick:function(){ mk.split = o[0]; mk.pairs = null; changed(); commit(); }})); });
+      card.appendChild(sseg);
+      var sp = mk.split ? splitProblem(picked, mk.courts) : "";
+      card.appendChild(el("p",{cls: sp ? "note warntext" : "note", text: sp || (mk.split ? "Men only play men and ladies only play ladies, on their own courts. Each group gets its own leaderboard." : "Everyone plays together in one group.")}));
+    }
+
     // 4. Pairs, for fixed-partner formats
-    var needPairs = FORMATS[mk.format].pairs;
+    var needPairs = allPairs(mk);
     if (needPairs){
-      card.appendChild(el("div",{cls:"step", text:"4. Pairs"}));
-      if (picked.length % 2){ card.appendChild(el("p",{cls:"note", text:"Pick an even number of players to make pairs."})); }
+      step("Pairs");
+      var odd = mk.split ? (men % 2 ? "Pick an even number of men to make pairs." : ((picked.length - men) % 2 ? "Pick an even number of ladies to make pairs." : "")) : (picked.length % 2 ? "Pick an even number of players to make pairs." : "");
+      if (odd){ card.appendChild(el("p",{cls:"note", text:odd})); }
       else if (picked.length >= 6){
         var valid = mk.pairs && mk.pairs.length * 2 === picked.length && mk.pairs.every(function(p){ return picked.indexOf(p[0]) >= 0 && picked.indexOf(p[1]) >= 0; });
-        if (!valid) mk.pairs = balancedPairs(picked);
-        card.appendChild(el("p",{cls:"note", text:"Pairs start balanced by rating (strongest with weakest). Tap two names to swap them."}));
+        if (!valid) mk.pairs = makePairs(picked, mk.split);
+        card.appendChild(el("p",{cls:"note", text:"Pairs start balanced by rating (strongest with weakest)" + (mk.split ? ", men with men and ladies with ladies" : "") + ". Tap two names to swap them."}));
         var pw = el("div",{cls:"pairs"});
         mk.pairs.forEach(function(pr, i){
           pw.appendChild(el("div",{cls:"pairrow"},[el("span",{cls:"pn", text:String(i + 1)})].concat(pr.map(function(id, j){
@@ -1412,18 +1492,18 @@ details.how .rules li{font-size:15.5px}
         });
         card.appendChild(pw);
         card.appendChild(el("div",{cls:"actions"},[
-          el("button",{cls:"btn ghost", text:"Balance by rating", onclick:function(){ mk.pairs = balancedPairs(picked); mk.swap = null; changed(); render(); }}),
-          el("button",{cls:"btn ghost", text:"Shuffle", onclick:function(){ var s = shuffle(picked.slice()); mk.pairs = []; for (var i = 0; i < s.length; i += 2) mk.pairs.push([s[i], s[i+1]]); mk.swap = null; changed(); render(); }})
+          el("button",{cls:"btn ghost", text:"Balance by rating", onclick:function(){ mk.pairs = makePairs(picked, mk.split); mk.swap = null; changed(); render(); }}),
+          el("button",{cls:"btn ghost", text:"Shuffle", onclick:function(){ mk.pairs = makePairs(picked, mk.split, true); mk.swap = null; changed(); render(); }})
         ]));
       }
     }
 
-    // 4. Pairs that stay together, for Americano (e.g. mixed couples); everyone else rotates
-    var keepPairs = mk.format === "americano";
+    // Pairs that stay together (e.g. mixed couples) in Americano and Mexicano; everyone else rotates
+    var keepPairs = !needPairs && !mk.split;
     if (keepPairs){
       mk.fixed = (mk.fixed || []).filter(function(pr){ return picked.indexOf(pr[0]) >= 0 && picked.indexOf(pr[1]) >= 0; });
       if (mk.fixPick && picked.indexOf(mk.fixPick) < 0) mk.fixPick = null;
-      card.appendChild(el("div",{cls:"step", text:"4. Pairs that stay together (optional)"}));
+      step("Pairs that stay together (optional)");
       card.appendChild(el("p",{cls:"note", text:"Want a mixed pair to play together all session? Tap one player, then their partner. Everyone else still rotates partners every round."}));
       var taken = {}; mk.fixed.forEach(function(pr){ taken[pr[0]] = taken[pr[1]] = 1; });
       if (mk.fixed.length){
@@ -1451,23 +1531,34 @@ details.how .rules li{font-size:15.5px}
     }
 
     // 5. Schedule
-    card.appendChild(el("div",{cls:"step", text:(needPairs || keepPairs ? "5" : "4") + ". Schedule"}));
+    step("Schedule");
     var smsg = el("div",{cls:"msg", text:mk.msg || ""});
     function build(){
       if (picked.length < 6){ mk.msg = "A ranked event needs at least 6 players."; return false; }
-      var list, fit = fitRounds(mk), mins = roundMins(mk);
-      mk.cut = 0;
+      var fit = fitRounds(mk), mins = roundMins(mk), split = !!(mixed && mk.split);
+      if (split){ var sp = splitProblem(picked, mk.courts); if (sp){ mk.msg = sp; return false; } }
       if (needPairs){
-        if (picked.length % 2){ mk.msg = "Pick an even number of players to make pairs."; return false; }
-        list = roundRobin(mk.pairs, Math.min(mk.courts, Math.floor(mk.pairs.length / 2)));
-        var all = maxRound(list);
-        if (fit && all > fit){ mk.cut = all; list = list.filter(function(m){ return m.round <= fit; }); }
+        if (!mk.pairs || mk.pairs.length * 2 !== picked.length){ mk.msg = "Pick an even number of players to make pairs."; return false; }
+        if (split && mk.pairs.some(function(pr){ return (S.players[pr[0]].gender === "F") !== (S.players[pr[1]].gender === "F"); })){ mk.msg = "When men and ladies are split, each pair must be two men or two ladies."; return false; }
       }
-      else if (mk.format === "mexicano"){ mk.rounds = fit || 6; list = mexicanoRound(picked, mk.courts, 1, []); }
-      else if (mk.fixed && mk.fixed.length) list = americanoFixed(picked, mk.fixed, mk.courts, fit || 6);
-      else list = americano(picked, mk.courts, fit || 6);
-      var cup = mk.level === "major" ? "Major" : FORMATS[mk.format].label;
-      mk.sched = list.map(function(m){ return {round:m.round, court:m.court, time: mk.start ? addMins(mk.start, (m.round - 1) * mins) : "", cup:cup, a1:m.a[0], a2:m.a[1], b1:m.b[0], b2:m.b[1]}; });
+      var fixedNow = needPairs ? mk.pairs : (split ? [] : (mk.fixed || []));
+      mk.cut = 0;
+      var groups = playGroups(picked, split, mk.courts, mk.level === "major" ? "Major" : fmtLabel(mk.level, mk.format));
+      var list = mergeGroups(groups.map(function(g){
+        var gp = fixedNow.filter(function(pr){ return g.ids.indexOf(pr[0]) >= 0 && g.ids.indexOf(pr[1]) >= 0; }), l;
+        if (mk.format === "mexicano") l = mexicanoRound(g.ids, g.courts, 1, [], gp);
+        else if (needPairs){
+          l = roundRobin(gp, Math.max(1, Math.min(g.courts, Math.floor(gp.length / 2))));
+          var all = maxRound(l);
+          if (fit && all > fit){ mk.cut = Math.max(mk.cut, all); l = l.filter(function(m){ return m.round <= fit; }); }
+        }
+        else if (gp.length) l = americanoFixed(g.ids, gp, g.courts, fit || 6);
+        else l = americano(g.ids, g.courts, fit || 6);
+        return {cup:g.cup, courts:g.courts, list:l};
+      }));
+      if (mk.format === "mexicano") mk.rounds = fit || 6;
+      mk.setup = {split:split, fixed:fixedNow};
+      mk.sched = list.map(function(m){ return {round:m.round, court:m.court, time: mk.start ? addMins(mk.start, (m.round - 1) * mins) : "", cup:m.cup, a1:m.a[0], a2:m.a[1], b1:m.b[0], b2:m.b[1]}; });
       mk.msg = ""; return true;
     }
     card.appendChild(el("button",{cls:"btn ghost wide", text: mk.sched ? "Shuffle the schedule again" : "Make the schedule", onclick:function(){ build(); commit(); }}));
@@ -1479,7 +1570,7 @@ details.how .rules li{font-size:15.5px}
         rm.forEach(function(m){ [m.a1,m.a2,m.b1,m.b2].forEach(function(id){ inR[id] = 1; }); });
         var rest = picked.filter(function(id){ return !inR[id]; });
         pv.appendChild(el("div",{cls:"rnd"},["Round " + r + (rm[0].time ? ", " + rm[0].time : ""), rest.length ? el("span",{cls:"rest", text:"  ·  Rest: " + rest.map(nameOf).join(", ")}) : null]));
-        rm.forEach(function(m){ pv.appendChild(el("div",{cls:"pvrow", text:"C" + m.court + "  " + nameOf(m.a1) + " / " + nameOf(m.a2) + "  v  " + nameOf(m.b1) + " / " + nameOf(m.b2)})); });
+        rm.forEach(function(m){ pv.appendChild(el("div",{cls:"pvrow", text:"C" + m.court + "  " + (mixed && mk.split ? m.cup + ": " : "") + nameOf(m.a1) + " / " + nameOf(m.a2) + "  v  " + nameOf(m.b1) + " / " + nameOf(m.b2)})); });
       }
       var counts = picked.map(function(id){ return playing[id] || 0; });
       card.appendChild(el("p",{cls:"note", text: mk.format === "mexicano" ? "This is round 1 of " + mk.rounds + ". You'll make each next round from Game On once the scores are in." : (mk.sched.length + " games over " + rounds + " rounds. Everyone plays " + (Math.min.apply(null, counts) === Math.max.apply(null, counts) ? counts[0] : Math.min.apply(null, counts) + " to " + Math.max.apply(null, counts)) + " games." + (mk.cut ? " Every pair meeting every other pair would take " + mk.cut + " rounds, so only the first " + rounds + " fit in your court time." : (fitRounds(mk) ? "" : " Add the court times above to fit the rounds to your booking.")))}));
@@ -1496,7 +1587,7 @@ details.how .rules li{font-size:15.5px}
       var time = mk.start ? addMins(mk.start, 0) + (mk.end ? " – " + addMins(mk.end, 0) : "") : "";
       go.disabled = true; go.textContent = "Creating…";
       hostPost({action:"createEvent", level:mk.level, format:mk.format, name:name, venue:mk.venue, date:mk.date, time:time,
-        total: FORMATS[mk.format].points ? mk.total : "", courts:mk.courts, rounds: mk.format === "mexicano" ? mk.rounds : "", players:picked, matches:mk.sched}).then(function(res){
+        total: FORMATS[mk.format].points ? mk.total : "", courts:mk.courts, rounds: mk.format === "mexicano" ? mk.rounds : "", players:picked, setup:mk.setup, matches:mk.sched}).then(function(res){
         go.disabled = false; go.textContent = "Create event";
         if (res.ok){ UI.mk = null; UI.tab = "session"; UI.live = res.id; lsSet("mt-tab", UI.tab); load(); window.scrollTo(0,0); }
         else { mk.msg = res.error; render(); }

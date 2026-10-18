@@ -16,7 +16,7 @@
 
 var TABS = {
   Players: ['id', 'name', 'gender', 'joined'],
-  Stops: ['id', 'name', 'date', 'venue', 'total', 'created', 'time', 'level', 'format', 'host', 'courts', 'rounds', 'players'],
+  Stops: ['id', 'name', 'date', 'venue', 'total', 'created', 'time', 'level', 'format', 'host', 'courts', 'rounds', 'players', 'setup'],
   Matches: ['id', 'stop', 'cup', 'round', 'time', 'court', 'a1', 'a2', 'b1', 'b2', 'sa', 'sb', 'seq', 'enteredBy', 'updated', 'sets'],
   ScoreLog: ['time', 'name', 'matchId', 'match', 'oldScore', 'newScore'],
   Settings: ['key', 'value', 'note'],
@@ -28,7 +28,7 @@ var TABS = {
 // Event levels a Court Captain can pick, and the formats each one allows. Only the organiser can run a Major.
 var LEVELS = {
   social: ['americano', 'mexicano'],
-  team: ['team'],
+  team: ['team', 'mexicano'],
   match: ['short', 'full'],
   major: ['americano', 'mexicano', 'team', 'short', 'full']
 };
@@ -280,11 +280,27 @@ function createEvent(req) {
   var out;
   try { out = matchRows(id, list, players, 0); } catch (err) { return { ok: false, error: err.message }; }
   sheet('Stops').appendRow([id, name, date, cleanText(req.venue, 60), isNaN(total) ? '' : String(total), new Date().toISOString(),
-    cleanText(req.time, 40), level, format, c.name, String(courts), String(planned), players.join(',')]);
+    cleanText(req.time, 40), level, format, c.name, String(courts), String(planned), players.join(','), setupText(req.setup, players)]);
   var sh = sheet('Matches');
   sh.getRange(sh.getLastRow() + 1, 1, out.length, out[0].length).setValues(out);
   sheet('ScoreLog').appendRow([new Date().toISOString(), c.name, id, 'Created ' + name + ' (' + out.length + ' games)', '–', 'created']);
   return { ok: true, id: id };
+}
+
+// How players are grouped: split into men and ladies, and pairs that stay together all event.
+function setupText(setup, players) {
+  setup = setup || {};
+  var used = {}, fixed = [];
+  (setup.fixed || []).forEach(function (pr) {
+    var a = String(pr[0]), b = String(pr[1]);
+    if (a !== b && players.indexOf(a) >= 0 && players.indexOf(b) >= 0 && !used[a] && !used[b]) { used[a] = used[b] = 1; fixed.push([a, b]); }
+  });
+  if (!setup.split && !fixed.length) return '';
+  return JSON.stringify({ split: !!setup.split, fixed: fixed });
+}
+
+function parseSetup(text) {
+  try { var o = JSON.parse(text); return { split: !!o.split, fixed: o.fixed || [] }; } catch (e) { return { split: false, fixed: [] }; }
 }
 
 // Adds the next round of a Mexicano event once the captain has made it on the website.
@@ -391,7 +407,7 @@ function readAll() {
   var stops = rows('Stops').map(function (s) {
     return {
       id: s.id, name: s.name, date: s.date, venue: s.venue, total: num(s.total), created: s.created, time: s.time,
-      level: s.level, format: s.format, host: s.host, courts: num(s.courts), rounds: num(s.rounds), players: s.players ? s.players.split(',') : []
+      level: s.level, format: s.format, host: s.host, courts: num(s.courts), rounds: num(s.rounds), players: s.players ? s.players.split(',') : [], setup: parseSetup(s.setup)
     };
   });
   var matches = rows('Matches').map(function (m) {
