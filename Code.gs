@@ -6,20 +6,31 @@
  * 2. Deploy → New deployment → Web app, Execute as: Me, Who has access: Anyone.
  * 3. Copy the Web app URL (ends in /exec) into index.html.
  *
- * Tabs: Players, Stops, Matches, ScoreLog, Settings, Rules, Comments.
+ * Tabs: Players, Stops, Matches, ScoreLog, Settings, Rules, Comments, Captains.
  * Comments: delete a row in the Comments tab to remove that comment from the website.
+ * Captains: one row per Court Captain with their name and their own Host PIN.
+ *   Delete a row to take away that captain's access.
  * Running setup again later is safe: it only adds tabs or columns that are missing.
  * PINs live in the Settings tab and are never sent to the website.
  */
 
 var TABS = {
   Players: ['id', 'name', 'gender', 'joined'],
-  Stops: ['id', 'name', 'date', 'venue', 'total', 'created', 'time'],
-  Matches: ['id', 'stop', 'cup', 'round', 'time', 'court', 'a1', 'a2', 'b1', 'b2', 'sa', 'sb', 'seq', 'enteredBy', 'updated'],
+  Stops: ['id', 'name', 'date', 'venue', 'total', 'created', 'time', 'level', 'format', 'host', 'courts', 'rounds', 'players'],
+  Matches: ['id', 'stop', 'cup', 'round', 'time', 'court', 'a1', 'a2', 'b1', 'b2', 'sa', 'sb', 'seq', 'enteredBy', 'updated', 'sets'],
   ScoreLog: ['time', 'name', 'matchId', 'match', 'oldScore', 'newScore'],
   Settings: ['key', 'value', 'note'],
   Rules: ['rule'],
-  Comments: ['id', 'article', 'time', 'name', 'text']
+  Comments: ['id', 'article', 'time', 'name', 'text'],
+  Captains: ['name', 'pin', 'note']
+};
+
+// Event levels a Court Captain can pick, and the formats each one allows. Only the organiser can run a Major.
+var LEVELS = {
+  social: ['americano', 'mexicano'],
+  team: ['team'],
+  match: ['short', 'full'],
+  major: ['americano', 'mexicano', 'team', 'short', 'full']
 };
 
 var DEFAULT_RULES = [
@@ -159,7 +170,11 @@ function handle(req) {
     case 'comment': return addComment(req);
     case 'checkScorePin': return checkPin('ScorePIN', req.pin) ? { ok: true } : { ok: false, error: "That Score PIN didn't work." };
     case 'checkAdmin': return admin(req) || { ok: true };
-    case 'addPlayer': return admin(req) || addPlayer(req);
+    case 'addPlayer': return (captain(req).name ? null : admin(req)) || addPlayer(req);
+    case 'checkHost': return checkHost(req);
+    case 'createEvent': return createEvent(req);
+    case 'addRound': return addRound(req);
+    case 'deleteEvent': return deleteEvent(req);
     case 'addStop': return admin(req) || addStop(req);
     case 'addMatch': return admin(req) || addMatch(req);
     case 'deleteMatch': return admin(req) || deleteMatch(req);
@@ -176,6 +191,7 @@ function saveScore(req) {
   if (!name) return { ok: false, error: 'Type your name first.' };
   if (!checkPin('ScorePIN', req.pin)) return { ok: false, error: "That Score PIN didn't work.", badPin: true };
   var sa = scoreVal(req.sa), sb = scoreVal(req.sb);
+  var sets = req.sets ? String(req.sets).replace(/[^0-9\- ]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40) : '';
   if (sa === undefined || sb === undefined) return { ok: false, error: 'Scores must be whole numbers.' };
   if ((sa === '') !== (sb === '')) return { ok: false, error: 'Enter both scores, or clear both.' };
 
@@ -185,17 +201,124 @@ function saveScore(req) {
   var m = {}; cols.forEach(function (c, i) { m[c] = String(vals[i]); });
   var oldScore = m.sa === '' ? '–' : m.sa + '–' + m.sb;
   var newScore = sa === '' ? '–' : sa + '–' + sb;
-  if (oldScore === newScore) return { ok: true, match: m, unchanged: true };
+  if (sets) newScore += ' (' + sets + ')';
+  if (oldScore === newScore && (m.sets || '') === sets) return { ok: true, match: m, unchanged: true };
 
   var now = new Date().toISOString();
-  m.sa = String(sa); m.sb = String(sb); m.enteredBy = sa === '' ? '' : name; m.updated = now;
+  m.sa = String(sa); m.sb = String(sb); m.enteredBy = sa === '' ? '' : name; m.updated = now; m.sets = sa === '' ? '' : sets;
   sh.getRange(row, cols.indexOf('sa') + 1, 1, 2).setValues([[m.sa, m.sb]]);
-  sh.getRange(row, cols.indexOf('enteredBy') + 1, 1, 2).setValues([[m.enteredBy, now]]);
+  sh.getRange(row, cols.indexOf('enteredBy') + 1, 1, 3).setValues([[m.enteredBy, now, m.sets]]);
 
   var names = playerNames();
   var desc = m.cup + ' R' + m.round + ' C' + m.court + ': ' + names(m.a1) + '/' + names(m.a2) + ' v ' + names(m.b1) + '/' + names(m.b2);
   sheet('ScoreLog').appendRow([now, name, m.id, desc, oldScore, newScore]);
   return { ok: true, match: m };
+}
+
+/* Court Captains --------------------------------------------------- */
+
+// Returns {name, admin} for a valid Host PIN (or the Admin PIN), otherwise {}.
+function captain(req) {
+  if (req.adminPin && checkPin('AdminPIN', req.adminPin)) return { name: 'Organiser', admin: true };
+  var pin = String(req.hostPin || '').trim();
+  if (!pin) return {};
+  var list = rows('Captains');
+  for (var i = 0; i < list.length; i++) if (list[i].pin !== '' && list[i].pin === pin) return { name: list[i].name, admin: false };
+  return {};
+}
+
+// Slows down guessing Host PINs the same way as the Admin PIN.
+function host(req) {
+  var cache = CacheService.getScriptCache();
+  var fails = parseInt(cache.get('hostFails') || '0', 10);
+  if (fails >= 20) return { error: { ok: false, error: 'Too many wrong Host PINs. Wait 15 minutes and try again.' } };
+  var c = captain(req);
+  if (c.name) return c;
+  cache.put('hostFails', String(fails + 1), 900);
+  return { error: { ok: false, error: "That Host PIN didn't work. Ask the organiser for yours.", badPin: true } };
+}
+
+function checkHost(req) {
+  var c = host(req);
+  return c.error || { ok: true, name: c.name, admin: c.admin };
+}
+
+function ownsStop(c, stop) {
+  return c.admin || (stop && String(stop.host).toLowerCase() === String(c.name).toLowerCase());
+}
+
+function matchRows(stopId, list, playerIds, cupIdx) {
+  var out = [], now = Date.now().toString(36);
+  for (var i = 0; i < list.length; i++) {
+    var m = list[i], ids = [m.a1, m.a2, m.b1, m.b2].map(String);
+    if (ids.some(function (x) { return playerIds.indexOf(x) < 0; })) throw new Error('Every player in a game must be on the event list.');
+    if (ids.filter(function (x, j) { return ids.indexOf(x) === j; }).length !== 4) throw new Error('A player can only appear once in a game.');
+    var round = parseInt(m.round, 10) || 1, court = parseInt(m.court, 10) || 1;
+    out.push(['m-' + now + i.toString(36) + Math.random().toString(36).slice(2, 5), stopId, cleanText(m.cup, 40) || 'Cup', String(round),
+      cleanText(m.time, 10), String(court), ids[0], ids[1], ids[2], ids[3], '', '', String(cupIdx * 1000 + round * 10 + court), '', '', '']);
+  }
+  return out;
+}
+
+function createEvent(req) {
+  var c = host(req);
+  if (c.error) return c.error;
+  var level = String(req.level || ''), format = String(req.format || '');
+  if (!LEVELS[level] || LEVELS[level].indexOf(format) < 0) return { ok: false, error: 'Pick a level and a format.' };
+  if (level === 'major' && !c.admin) return { ok: false, error: 'Only the organiser can run a Major.' };
+  var name = cleanText(req.name, 60);
+  if (!name) return { ok: false, error: 'Give the event a name.' };
+  if (rows('Stops').some(function (s) { return s.name.toLowerCase() === name.toLowerCase(); })) return { ok: false, error: name + ' already exists. Change the number.' };
+  var known = rows('Players').map(function (p) { return p.id; });
+  var players = (req.players || []).map(String).filter(function (x, i, a) { return known.indexOf(x) >= 0 && a.indexOf(x) === i; });
+  if (players.length < 6) return { ok: false, error: 'A ranked event needs at least 6 players.' };
+  var list = req.matches || [];
+  if (!list.length) return { ok: false, error: 'Make the schedule first.' };
+  var date = /^\d{4}-\d{2}-\d{2}$/.test(req.date || '') ? req.date : '';
+  var total = parseInt(req.total, 10), courts = parseInt(req.courts, 10) || 1, planned = parseInt(req.rounds, 10) || '';
+  var id = 'stop-' + Date.now().toString(36);
+  var out;
+  try { out = matchRows(id, list, players, 0); } catch (err) { return { ok: false, error: err.message }; }
+  sheet('Stops').appendRow([id, name, date, cleanText(req.venue, 60), isNaN(total) ? '' : String(total), new Date().toISOString(),
+    cleanText(req.time, 40), level, format, c.name, String(courts), String(planned), players.join(',')]);
+  var sh = sheet('Matches');
+  sh.getRange(sh.getLastRow() + 1, 1, out.length, out[0].length).setValues(out);
+  sheet('ScoreLog').appendRow([new Date().toISOString(), c.name, id, 'Created ' + name + ' (' + out.length + ' games)', '–', 'created']);
+  return { ok: true, id: id };
+}
+
+// Adds the next round of a Mexicano event once the captain has made it on the website.
+function addRound(req) {
+  var c = host(req);
+  if (c.error) return c.error;
+  var stop = rows('Stops').filter(function (s) { return s.id === String(req.stop); })[0];
+  if (!stop) return { ok: false, error: 'That event no longer exists.' };
+  if (!ownsStop(c, stop)) return { ok: false, error: 'Only ' + stop.host + ' or the organiser can add rounds to this event.' };
+  var round = parseInt(req.round, 10);
+  if (rows('Matches').some(function (m) { return m.stop === stop.id && parseInt(m.round, 10) === round; })) return { ok: false, error: 'Round ' + round + ' is already there. Refresh the page.' };
+  var out;
+  try { out = matchRows(stop.id, req.matches || [], String(stop.players).split(','), 0); } catch (err) { return { ok: false, error: err.message }; }
+  if (!out.length) return { ok: false, error: 'No games to add.' };
+  var sh = sheet('Matches');
+  sh.getRange(sh.getLastRow() + 1, 1, out.length, out[0].length).setValues(out);
+  return { ok: true };
+}
+
+function deleteEvent(req) {
+  var c = host(req);
+  if (c.error) return c.error;
+  var sh = sheet('Stops'), row = findRow(sh, req.stop);
+  if (!row) return { ok: true };
+  var stop = rows('Stops').filter(function (s) { return s.id === String(req.stop); })[0];
+  if (!ownsStop(c, stop)) return { ok: false, error: 'Only ' + stop.host + ' or the organiser can delete this event.' };
+  var ms = sheet('Matches'), n = ms.getLastRow() - 1;
+  if (n > 0) {
+    var stops = ms.getRange(2, 2, n, 1).getValues();
+    for (var i = stops.length - 1; i >= 0; i--) if (String(stops[i][0]) === stop.id) ms.deleteRow(i + 2);
+  }
+  sh.deleteRow(row);
+  sheet('ScoreLog').appendRow([new Date().toISOString(), c.name, stop.id, 'Deleted event ' + stop.name, '–', 'deleted']);
+  return { ok: true };
 }
 
 function addComment(req) {
@@ -263,15 +386,19 @@ function deleteMatch(req) {
 /* ------------------------------------------------------------------ */
 
 function readAll() {
+  ensureHeader('Stops'); ensureHeader('Matches'); ensureTab('Captains');
   var players = rows('Players').map(function (p) { return { id: p.id, name: p.name, gender: p.gender === 'F' ? 'F' : 'M' }; });
   var stops = rows('Stops').map(function (s) {
-    return { id: s.id, name: s.name, date: s.date, venue: s.venue, total: num(s.total), created: s.created, time: s.time };
+    return {
+      id: s.id, name: s.name, date: s.date, venue: s.venue, total: num(s.total), created: s.created, time: s.time,
+      level: s.level, format: s.format, host: s.host, courts: num(s.courts), rounds: num(s.rounds), players: s.players ? s.players.split(',') : []
+    };
   });
   var matches = rows('Matches').map(function (m) {
     return {
       id: m.id, stop: m.stop, cup: m.cup, round: num(m.round) || 1, time: m.time, court: num(m.court),
       a: [m.a1, m.a2], b: [m.b1, m.b2], sa: num(m.sa), sb: num(m.sb), seq: num(m.seq) || 0,
-      enteredBy: m.enteredBy, updated: m.updated
+      enteredBy: m.enteredBy, updated: m.updated, sets: m.sets
     };
   });
   var ruleTab = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Rules');
@@ -307,6 +434,14 @@ function ensureTab(name) {
   sh.setFrozenRows(1);
   sh.getRange(1, 1, sh.getMaxRows(), TABS[name].length).setNumberFormat('@');
   return sh;
+}
+
+// Adds header names for columns that newer versions of this script use.
+function ensureHeader(name) {
+  var sh = sheet(name), cols = TABS[name];
+  if (sh.getLastColumn() >= cols.length) return;
+  sh.getRange(1, 1, 1, cols.length).setValues([cols]).setFontWeight('bold');
+  sh.getRange(1, 1, sh.getMaxRows(), cols.length).setNumberFormat('@');
 }
 
 function sheet(name) {
