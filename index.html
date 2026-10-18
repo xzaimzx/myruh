@@ -112,6 +112,7 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
 .field input,.field select{border:1.5px solid var(--line);border-radius:10px;background:var(--bg);padding:10px 12px;font-size:16px;width:100%}
 .field select{background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 18px) 55%,calc(100% - 13px) 55%;background-size:5px 5px;background-repeat:no-repeat;padding-right:32px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tpick{display:flex;gap:4px}.field .tpick select{flex:1;min-width:0;padding:10px 4px;background-image:none;text-align:center;text-align-last:center}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
 .btn{border:0;border-radius:12px;padding:12px 14px;font-weight:600;font-size:15px;cursor:pointer}
 .btn.primary{background:var(--ink);color:var(--bg)}
@@ -1439,6 +1440,20 @@ details.how .rules li{font-size:15.5px}
     main.appendChild(createCard());
   }
 
+  // Hour, minute and AM/PM boxes. Phones set to 24-hour time drop AM/PM from the built-in time box, so this is always 12-hour.
+  function timePick(val, label, set){
+    var m = /^(\d{1,2}):(\d{2})/.exec(val || ""), h24 = m ? +m[1] : null, mi = m ? m[2] : "00";
+    var h = el("select",{"aria-label":label + " hour"}), mn = el("select",{"aria-label":label + " minutes"}), ap = el("select",{"aria-label":label + " AM or PM"});
+    h.appendChild(el("option",{value:"", text:"--"}));
+    for (var i = 1; i <= 12; i++) h.appendChild(el("option",{value:String(i), text:String(i), selected: h24 !== null && ((h24 % 12) || 12) === i ? "selected" : null}));
+    var mins = ["00","15","30","45"]; if (mins.indexOf(mi) < 0) mins.push(mi);
+    mins.forEach(function(x){ mn.appendChild(el("option",{value:x, text:x, selected: x === mi ? "selected" : null})); });
+    ["AM","PM"].forEach(function(x){ ap.appendChild(el("option",{value:x, text:x, selected: (h24 === null ? x === "PM" : (h24 >= 12) === (x === "PM")) ? "selected" : null})); });
+    function upd(){ if (!h.value){ set(""); return; } var hh = (+h.value % 12) + (ap.value === "PM" ? 12 : 0); set((hh < 10 ? "0" : "") + hh + ":" + mn.value); }
+    [h, mn, ap].forEach(function(x){ x.addEventListener("change", upd); });
+    return el("div",{cls:"tpick"},[h, mn, ap]);
+  }
+
   function createCard(){
     var mk = UI.mk || (UI.mk = newMk());
     UI.mkC = null;
@@ -1461,8 +1476,8 @@ details.how .rules li{font-size:15.5px}
     card.appendChild(field("Event name", nm));
     var dt = el("input",{type:"date", value:mk.date}); dt.addEventListener("input", function(){ mk.date = dt.value; changed(); });
     card.appendChild(field("Date", dt));
-    var st = el("input",{type:"time", value:mk.start}); st.addEventListener("input", function(){ mk.start = st.value; mk.sched = null; });
-    var en = el("input",{type:"time", value:mk.end}); en.addEventListener("input", function(){ mk.end = en.value; mk.sched = null; });
+    var st = timePick(mk.start, "Court starts", function(v){ mk.start = v; mk.sched = null; commit(); });
+    var en = timePick(mk.end, "Court ends", function(v){ mk.end = v; mk.sched = null; commit(); });
     card.appendChild(el("div",{cls:"grid2"},[field("Court starts", st), field("Court ends", en)]));
     var ct = el("select"); [1,2,3,4].forEach(function(n){ ct.appendChild(el("option",{value:String(n), text:n + (n === 1 ? " court" : " courts"), selected: mk.courts === n ? "selected" : null})); });
     ct.addEventListener("change", function(){ mk.courts = +ct.value; changed(); commit(); });
