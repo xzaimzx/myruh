@@ -369,8 +369,14 @@ details.how .rules li{font-size:15.5px}
     return FORMATS[f].hint;
   }
   function allPairs(mk){ return FORMATS[mk.format].pairs || mk.level === "team"; }
-  function makePairs(ids, split, random){
+  function makePairs(ids, split, random, mx){
     var mk2 = function(g){ if (!random) return balancedPairs(g); var s = shuffle(g.slice()), out = []; for (var i = 0; i + 1 < s.length; i += 2) out.push([s[i], s[i+1]]); return out; };
+    if (mx){
+      var m = ids.filter(function(id){ return S.players[id].gender !== "F"; }), l = ids.filter(function(id){ return S.players[id].gender === "F"; });
+      if (random){ m = shuffle(m); l = shuffle(l); }
+      else { m.sort(function(a,b){ return rating(b) - rating(a); }); l.sort(function(a,b){ return rating(a) - rating(b); }); }
+      return m.slice(0, l.length).map(function(id, i){ return [id, l[i]]; });
+    }
     if (!split) return mk2(ids);
     return mk2(ids.filter(function(id){ return S.players[id].gender !== "F"; })).concat(mk2(ids.filter(function(id){ return S.players[id].gender === "F"; })));
   }
@@ -887,9 +893,11 @@ details.how .rules li{font-size:15.5px}
     if (f === "americano") out.push("Partners change every round, as shown in the schedule.");
     var su = stop.setup || {}, team = stop.level === "team";
     if (su.split) out.push("Men play men and ladies play ladies, on their own courts.");
+    if (su.mixed) out.push("Mixed doubles: every pair is one man and one lady.");
     if (team) out.push("Keep the same partner all event.");
     else if (su.fixed && su.fixed.length && f !== "team" && FORMATS[f] && !FORMATS[f].pairs) out.push("These pairs stay together all event: " + su.fixed.map(function(pr){ return nameOf(pr[0]) + " & " + nameOf(pr[1]); }).join(", ") + ". Everyone else changes partner.");
-    if (f === "mexicano") out.push(team ? "Round 1 is set by ranking. After that, pairs meet by the day's standings: 1st v 2nd, 3rd v 4th." : "Round 1 is set by ranking. After that, each court pairs 1st and 4th against 2nd and 3rd on the day's standings.");
+    if (f === "mexicano" && su.mixed && !team) out.push("Round 1 is set by ranking. After that, men and ladies are ranked apart on the day's standings: the top man partners the 2nd lady, and the 2nd man partners the top lady.");
+    else if (f === "mexicano") out.push(team ? "Round 1 is set by ranking. After that, pairs meet by the day's standings: 1st v 2nd, 3rd v 4th." : "Round 1 is set by ranking. After that, each court pairs 1st and 4th against 2nd and 3rd on the day's standings.");
     if (f === "team") out.push((team ? "" : "Keep the same partner all event. ") + "Every pair plays every other pair.");
     if (f === "short") out = out.concat(["Keep the same partner all event.", "Play exactly 6 games, so scores can be 6–0, 5–1, 4–2 or 3–3.", "Golden point at deuce: the receiving pair picks the side.", "At 3–3, play a tiebreak to 7 points and enter it as 4–3."]);
     if (f === "full") out = out.concat(["Keep the same partner all event.", "Normal padel sets, 1 set or best of 3, as the Court Captain announced.", "Enter the sets, like 6-4 or 6-4 3-6 7-5."]);
@@ -1214,6 +1222,74 @@ details.how .rules li{font-size:15.5px}
     }
     return out;
   }
+  // Mixed doubles only: picks who plays this round (fewest games first) as man-and-lady teams. Fixed pairs count as one team.
+  function pickMixed(players, fixed, courts, games){
+    var inF = {}; fixed.forEach(function(pr){ inF[pr[0]] = inF[pr[1]] = 1; });
+    var byG = function(a){ return shuffle(a).sort(function(x,y){ return games(x) - games(y); }); };
+    var men = byG(players.filter(function(p){ return !inF[p] && S.players[p].gender !== "F"; })), ladies = byG(players.filter(function(p){ return !inF[p] && S.players[p].gender === "F"; }));
+    var fx = shuffle(fixed.slice()).sort(function(x,y){ return games(x[0]) - games(y[0]); });
+    var k = Math.min(courts, Math.floor((fx.length + Math.min(men.length, ladies.length)) / 2));
+    var out = {k:k, fx:[], men:[], ladies:[]}, i = 0, j = 0;
+    for (var n = 0; n < 2 * k; n++){
+      var gf = i < fx.length ? games(fx[i][0]) : Infinity, gs = j < Math.min(men.length, ladies.length) ? (games(men[j]) + games(ladies[j])) / 2 : Infinity;
+      if (gf < gs){ out.fx.push(fx[i++]); } else { out.men.push(men[j]); out.ladies.push(ladies[j]); j++; }
+    }
+    return out;
+  }
+  function americanoMixed(players, fixed, courts, rounds){
+    var games = {}, pc = {}, oc = {}, out = [], g = function(p){ return games[p]; };
+    players.forEach(function(p){ games[p] = 0; });
+    for (var r = 1; r <= rounds; r++){
+      var pk = pickMixed(players, fixed, courts, g);
+      if (!pk.k) break;
+      var best = null, bestCost = Infinity;
+      for (var t = 0; t < 300 && bestCost > 0; t++){
+        var l = shuffle(pk.ladies.slice()), teams = pk.fx.slice(), cost = 0, grp = [];
+        pk.men.forEach(function(m, i){ teams.push([m, l[i]]); cost += 4 * Math.pow(pc[pkey(m, l[i])] || 0, 2); });
+        teams = shuffle(teams);
+        for (var c = 0; c < pk.k; c++){
+          var a = teams[2*c], b = teams[2*c+1];
+          a.forEach(function(x){ b.forEach(function(y){ cost += Math.pow(oc[pkey(x,y)] || 0, 2); }); });
+          grp.push([a, b]);
+        }
+        if (cost < bestCost){ bestCost = cost; best = grp; }
+      }
+      best.forEach(function(o, i){
+        pc[pkey(o[0][0],o[0][1])] = (pc[pkey(o[0][0],o[0][1])] || 0) + 1; pc[pkey(o[1][0],o[1][1])] = (pc[pkey(o[1][0],o[1][1])] || 0) + 1;
+        o[0].forEach(function(x){ o[1].forEach(function(y){ oc[pkey(x,y)] = (oc[pkey(x,y)] || 0) + 1; }); });
+        out.push({round:r, court:i + 1, a:o[0], b:o[1]});
+        o[0].concat(o[1]).forEach(function(p){ games[p]++; });
+      });
+    }
+    return out;
+  }
+  // Mixed Mexicano: men and ladies are ranked apart; on each block the 1st man plays with the 2nd lady and the 2nd man with the 1st lady, then teams meet by strength.
+  function mexicanoMixed(players, courts, round, ms, fixed){
+    var t = {};
+    players.forEach(function(p){ t[p] = {pts:0, g:0}; });
+    ms.forEach(function(m){ if (!scored(m)) return;
+      m.a.forEach(function(id){ if (t[id]){ t[id].pts += m.sa; t[id].g++; } });
+      m.b.forEach(function(id){ if (t[id]){ t[id].pts += m.sb; t[id].g++; } });
+    });
+    var avg = function(p){ return t[p].g ? t[p].pts / t[p].g : 0; }, by = function(a,b){ return avg(b) - avg(a) || rating(b) - rating(a); };
+    var pk = pickMixed(players, (fixed || []).filter(function(pr){ return t[pr[0]] && t[pr[1]]; }), courts, function(p){ return t[p].g; });
+    if (!pk.k) return [];
+    var men = pk.men.sort(by), ladies = pk.ladies.sort(by), teams = pk.fx.slice();
+    for (var i = 0; i < men.length; i += 2){
+      if (i + 1 < men.length){ teams.push([men[i], ladies[i+1]]); teams.push([men[i+1], ladies[i]]); } else teams.push([men[i], ladies[i]]);
+    }
+    var str = function(u){ return (avg(u[0]) + avg(u[1])) / 2; }, rt = function(u){ return (rating(u[0]) + rating(u[1])) / 2; };
+    teams.sort(function(a,b){ return str(b) - str(a) || rt(b) - rt(a); });
+    var out = [];
+    for (var c = 0; c < pk.k; c++) out.push({round:round, court:c + 1, a:teams[2*c], b:teams[2*c+1]});
+    return out;
+  }
+  function mixedProblem(ids, pairs){
+    var men = ids.filter(function(id){ return S.players[id].gender !== "F"; }).length, ladies = ids.length - men;
+    if (men < 2 || ladies < 2) return "Mixed doubles needs at least 2 men and 2 ladies.";
+    if (pairs && men !== ladies) return "With fixed pairs, mixed doubles needs the same number of men and ladies (now " + men + " men, " + ladies + " ladies).";
+    return "";
+  }
   // Splits the players into groups that play apart (men and ladies) and shares out the courts between them.
   function playGroups(ids, split, courts, cup){
     if (!split) return [{cup:cup, ids:ids, courts:courts}];
@@ -1266,7 +1342,7 @@ details.how .rules li{font-size:15.5px}
       UI.mkC = null; var players = (stop.players || []).filter(function(id){ return S.players[id]; });
       var su = stop.setup || {split:false, fixed:[]};
       var list = mergeGroups(playGroups(players, su.split, stop.courts || 1, ms[0] ? ms[0].cup : "Mexicano").map(function(g){
-        return {cup:g.cup, courts:g.courts, list:mexicanoRound(g.ids, g.courts, last + 1, ms, su.fixed)};
+        return {cup:g.cup, courts:g.courts, list:(su.mixed ? mexicanoMixed : mexicanoRound)(g.ids, g.courts, last + 1, ms, su.fixed)};
       }));
       btn.disabled = true; btn.textContent = "Making round " + (last + 1) + "…";
       hostPost({action:"addRound", stop:stop.id, round:last + 1, matches:list.map(function(m){ return {round:m.round, court:m.court, time:"", cup:m.cup, a1:m.a[0], a2:m.a[1], b1:m.b[0], b2:m.b[1]}; })}).then(function(res){
@@ -1460,14 +1536,15 @@ details.how .rules li{font-size:15.5px}
 
     // Men and ladies: play together, or split into two groups that play apart
     var mixed = mk.level !== "match" && men > 0 && men < picked.length;
-    if (!mixed) mk.split = false;
+    if (!mixed){ mk.split = false; mk.mx = false; }
     if (mixed){
       step("Men and ladies");
       var sseg = el("div",{cls:"seg", role:"group", "aria-label":"Men and ladies"});
-      [[false,"Play together"],[true,"Split men and ladies"]].forEach(function(o){ sseg.appendChild(el("button",{text:o[1], "aria-pressed": !!mk.split === o[0] ? "true" : "false", onclick:function(){ mk.split = o[0]; mk.pairs = null; changed(); commit(); }})); });
+      var mode = mk.split ? "split" : (mk.mx ? "mixed" : "together");
+      [["together","Play together"],["mixed","Mixed doubles only"],["split","Split men and ladies"]].forEach(function(o){ sseg.appendChild(el("button",{text:o[1], "aria-pressed": mode === o[0] ? "true" : "false", onclick:function(){ mk.split = o[0] === "split"; mk.mx = o[0] === "mixed"; mk.pairs = null; changed(); commit(); }})); });
       card.appendChild(sseg);
-      var sp = mk.split ? splitProblem(picked, mk.courts) : "";
-      card.appendChild(el("p",{cls: sp ? "note warntext" : "note", text: sp || (mk.split ? "Men only play men and ladies only play ladies, on their own courts. Each group gets its own leaderboard." : "Everyone plays together in one group.")}));
+      var sp = mk.split ? splitProblem(picked, mk.courts) : (mk.mx ? mixedProblem(picked, allPairs(mk)) : "");
+      card.appendChild(el("p",{cls: sp ? "note warntext" : "note", text: sp || (mk.split ? "Men only play men and ladies only play ladies, on their own courts. Each group gets its own leaderboard." : (mk.mx ? "Every pair is one man and one lady. If the numbers aren't equal, the extra players take turns to rest." : "Anyone can partner anyone."))}));
     }
 
     // 4. Pairs, for fixed-partner formats
@@ -1478,8 +1555,9 @@ details.how .rules li{font-size:15.5px}
       if (odd){ card.appendChild(el("p",{cls:"note", text:odd})); }
       else if (picked.length >= 6){
         var valid = mk.pairs && mk.pairs.length * 2 === picked.length && mk.pairs.every(function(p){ return picked.indexOf(p[0]) >= 0 && picked.indexOf(p[1]) >= 0; });
-        if (!valid) mk.pairs = makePairs(picked, mk.split);
-        card.appendChild(el("p",{cls:"note", text:"Pairs start balanced by rating (strongest with weakest)" + (mk.split ? ", men with men and ladies with ladies" : "") + ". Tap two names to swap them."}));
+        if (valid && mk.mx && mk.pairs.length * 2 !== picked.length) valid = false;
+        if (!valid) mk.pairs = makePairs(picked, mk.split, false, mk.mx);
+        card.appendChild(el("p",{cls:"note", text:"Pairs start balanced by rating (strongest with weakest)" + (mk.split ? ", men with men and ladies with ladies" : (mk.mx ? ", each man with a lady" : "")) + ". Tap two names to swap them."}));
         var pw = el("div",{cls:"pairs"});
         mk.pairs.forEach(function(pr, i){
           pw.appendChild(el("div",{cls:"pairrow"},[el("span",{cls:"pn", text:String(i + 1)})].concat(pr.map(function(id, j){
@@ -1492,8 +1570,8 @@ details.how .rules li{font-size:15.5px}
         });
         card.appendChild(pw);
         card.appendChild(el("div",{cls:"actions"},[
-          el("button",{cls:"btn ghost", text:"Balance by rating", onclick:function(){ mk.pairs = makePairs(picked, mk.split); mk.swap = null; changed(); render(); }}),
-          el("button",{cls:"btn ghost", text:"Shuffle", onclick:function(){ mk.pairs = makePairs(picked, mk.split, true); mk.swap = null; changed(); render(); }})
+          el("button",{cls:"btn ghost", text:"Balance by rating", onclick:function(){ mk.pairs = makePairs(picked, mk.split, false, mk.mx); mk.swap = null; changed(); render(); }}),
+          el("button",{cls:"btn ghost", text:"Shuffle", onclick:function(){ mk.pairs = makePairs(picked, mk.split, true, mk.mx); mk.swap = null; changed(); render(); }})
         ]));
       }
     }
@@ -1521,12 +1599,15 @@ details.how .rules li{font-size:15.5px}
           fl.appendChild(el("button",{cls:"pchip", "aria-pressed": mk.fixPick === id ? "true" : "false", onclick:function(){
             if (!mk.fixPick) mk.fixPick = id;
             else if (mk.fixPick === id) mk.fixPick = null;
+            else if (mk.mx && (S.players[mk.fixPick].gender === "F") === (S.players[id].gender === "F")){ mk.fixMsg = "In mixed doubles, a pair is one man and one lady."; render(); return; }
             else { mk.fixed.push([mk.fixPick, id]); mk.fixPick = null; changed(); }
             render();
           }},[nameOf(id), el("small",{text: S.players[id].gender === "F" ? " L" : " M"})]));
         });
         card.appendChild(fl);
-        if (mk.fixPick) card.appendChild(el("p",{cls:"note", text:"Now tap " + nameOf(mk.fixPick) + "'s partner."}));
+        if (mk.fixMsg) card.appendChild(el("p",{cls:"note warntext", text:mk.fixMsg}));
+        else if (mk.fixPick) card.appendChild(el("p",{cls:"note", text:"Now tap " + nameOf(mk.fixPick) + "'s partner."}));
+        mk.fixMsg = "";
       }
     }
 
@@ -1535,29 +1616,32 @@ details.how .rules li{font-size:15.5px}
     var smsg = el("div",{cls:"msg", text:mk.msg || ""});
     function build(){
       if (picked.length < 6){ mk.msg = "A ranked event needs at least 6 players."; return false; }
-      var fit = fitRounds(mk), mins = roundMins(mk), split = !!(mixed && mk.split);
+      var fit = fitRounds(mk), mins = roundMins(mk), split = !!(mixed && mk.split), mx = !!(mixed && mk.mx);
       if (split){ var sp = splitProblem(picked, mk.courts); if (sp){ mk.msg = sp; return false; } }
+      if (mx){ var mp = mixedProblem(picked, needPairs); if (mp){ mk.msg = mp; return false; } }
       if (needPairs){
         if (!mk.pairs || mk.pairs.length * 2 !== picked.length){ mk.msg = "Pick an even number of players to make pairs."; return false; }
+        if (mx && mk.pairs.some(function(pr){ return (S.players[pr[0]].gender === "F") === (S.players[pr[1]].gender === "F"); })){ mk.msg = "In mixed doubles, each pair must be one man and one lady."; return false; }
         if (split && mk.pairs.some(function(pr){ return (S.players[pr[0]].gender === "F") !== (S.players[pr[1]].gender === "F"); })){ mk.msg = "When men and ladies are split, each pair must be two men or two ladies."; return false; }
       }
-      var fixedNow = needPairs ? mk.pairs : (split ? [] : (mk.fixed || []));
+      var fixedNow = needPairs ? mk.pairs : (split ? [] : (mk.fixed || []).filter(function(pr){ return !mx || (S.players[pr[0]].gender === "F") !== (S.players[pr[1]].gender === "F"); }));
       mk.cut = 0;
-      var groups = playGroups(picked, split, mk.courts, mk.level === "major" ? "Major" : fmtLabel(mk.level, mk.format));
+      var groups = playGroups(picked, split, mk.courts, mx ? "Mixed" : (mk.level === "major" ? "Major" : fmtLabel(mk.level, mk.format)));
       var list = mergeGroups(groups.map(function(g){
         var gp = fixedNow.filter(function(pr){ return g.ids.indexOf(pr[0]) >= 0 && g.ids.indexOf(pr[1]) >= 0; }), l;
-        if (mk.format === "mexicano") l = mexicanoRound(g.ids, g.courts, 1, [], gp);
+        if (mk.format === "mexicano") l = (mx && !needPairs ? mexicanoMixed : mexicanoRound)(g.ids, g.courts, 1, [], gp);
         else if (needPairs){
           l = roundRobin(gp, Math.max(1, Math.min(g.courts, Math.floor(gp.length / 2))));
           var all = maxRound(l);
           if (fit && all > fit){ mk.cut = Math.max(mk.cut, all); l = l.filter(function(m){ return m.round <= fit; }); }
         }
+        else if (mx) l = americanoMixed(g.ids, gp, g.courts, fit || 6);
         else if (gp.length) l = americanoFixed(g.ids, gp, g.courts, fit || 6);
         else l = americano(g.ids, g.courts, fit || 6);
         return {cup:g.cup, courts:g.courts, list:l};
       }));
       if (mk.format === "mexicano") mk.rounds = fit || 6;
-      mk.setup = {split:split, fixed:fixedNow};
+      mk.setup = {split:split, mixed:mx, fixed:fixedNow};
       mk.sched = list.map(function(m){ return {round:m.round, court:m.court, time: mk.start ? addMins(mk.start, (m.round - 1) * mins) : "", cup:m.cup, a1:m.a[0], a2:m.a[1], b1:m.b[0], b2:m.b[1]}; });
       mk.msg = ""; return true;
     }

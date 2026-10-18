@@ -295,12 +295,12 @@ function setupText(setup, players) {
     var a = String(pr[0]), b = String(pr[1]);
     if (a !== b && players.indexOf(a) >= 0 && players.indexOf(b) >= 0 && !used[a] && !used[b]) { used[a] = used[b] = 1; fixed.push([a, b]); }
   });
-  if (!setup.split && !fixed.length) return '';
-  return JSON.stringify({ split: !!setup.split, fixed: fixed });
+  if (!setup.split && !setup.mixed && !fixed.length) return '';
+  return JSON.stringify({ split: !!setup.split, mixed: !setup.split && !!setup.mixed, fixed: fixed });
 }
 
 function parseSetup(text) {
-  try { var o = JSON.parse(text); return { split: !!o.split, fixed: o.fixed || [] }; } catch (e) { return { split: false, fixed: [] }; }
+  try { var o = JSON.parse(text); return { split: !!o.split, mixed: !!o.mixed, fixed: o.fixed || [] }; } catch (e) { return { split: false, fixed: [] }; }
 }
 
 // Adds the next round of a Mexicano event once the captain has made it on the website.
