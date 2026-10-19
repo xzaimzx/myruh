@@ -17,7 +17,7 @@
 var TABS = {
   Players: ['id', 'name', 'gender', 'joined'],
   Stops: ['id', 'name', 'date', 'venue', 'total', 'created', 'time', 'level', 'format', 'host', 'courts', 'rounds', 'players', 'setup', 'closes'],
-  Matches: ['id', 'stop', 'cup', 'round', 'time', 'court', 'a1', 'a2', 'b1', 'b2', 'sa', 'sb', 'seq', 'enteredBy', 'updated', 'sets'],
+  Matches: ['id', 'stop', 'cup', 'round', 'time', 'court', 'a1', 'a2', 'b1', 'b2', 'sa', 'sb', 'seq', 'enteredBy', 'updated', 'sets', 'subs'],
   ScoreLog: ['time', 'name', 'matchId', 'match', 'oldScore', 'newScore'],
   Settings: ['key', 'value', 'note'],
   Rules: ['rule'],
@@ -176,6 +176,7 @@ function handle(req) {
     case 'createEvent': return createEvent(req);
     case 'addRound': return addRound(req);
     case 'setPlayers': return setPlayers(req);
+    case 'swapPlayer': return swapPlayer(req);
     case 'visit': return addVisit(req);
     case 'deleteEvent': return deleteEvent(req);
     case 'addStop': return admin(req) || addStop(req);
@@ -258,7 +259,7 @@ function matchRows(stopId, list, playerIds, cupIdx) {
     if (ids.filter(function (x, j) { return ids.indexOf(x) === j; }).length !== 4) throw new Error('A player can only appear once in a game.');
     var round = parseInt(m.round, 10) || 1, court = parseInt(m.court, 10) || 1;
     out.push(['m-' + now + i.toString(36) + Math.random().toString(36).slice(2, 5), stopId, cleanText(m.cup, 40) || 'Cup', String(round),
-      cleanText(m.time, 10), String(court), ids[0], ids[1], ids[2], ids[3], '', '', String(cupIdx * 1000 + round * 10 + court), '', '', '']);
+      cleanText(m.time, 10), String(court), ids[0], ids[1], ids[2], ids[3], '', '', String(cupIdx * 1000 + round * 10 + court), '', '', '', '']);
   }
   return out;
 }
@@ -389,6 +390,49 @@ function setPlayers(req) {
   return { ok: true };
 }
 
+// Swaps an injured or tired player out of unscored games. Only those games change; the fill-in is marked so the
+// game counts for the Tour Rankings but not for their event total. With leave, the player is also taken off the event.
+function swapPlayer(req) {
+  var c = host(req);
+  if (c.error) return c.error;
+  var sh = sheet('Stops'), row = findRow(sh, req.stop);
+  var stop = rows('Stops').filter(function (s) { return s.id === String(req.stop); })[0];
+  if (!row || !stop) return { ok: false, error: 'That event no longer exists.' };
+  if (!ownsStop(c, stop)) return { ok: false, error: 'Only ' + stop.host + ' or the organiser can change this event.' };
+  var out = String(req.out || ''), swaps = req.swaps || [];
+  var known = rows('Players').map(function (p) { return p.id; });
+  if (!swaps.length) return { ok: false, error: 'Pick who comes in.' };
+  var ms = sheet('Matches'), cols = TABS.Matches, n = ms.getLastRow() - 1;
+  var vals = n > 0 ? ms.getRange(2, 1, n, cols.length).getValues() : [];
+  var ix = function (k) { return cols.indexOf(k); }, P = ['a1', 'a2', 'b1', 'b2'].map(ix);
+  var plan = [];
+  for (var k = 0; k < swaps.length; k++) {
+    var sw = swaps[k], inId = String(sw['in'] || '');
+    if (known.indexOf(inId) < 0) return { ok: false, error: 'Pick who comes in for every game.' };
+    var i = -1;
+    for (var j = 0; j < vals.length; j++) if (String(vals[j][0]) === String(sw.id) && String(vals[j][ix('stop')]) === stop.id) i = j;
+    if (i < 0) return { ok: false, error: 'A game has changed. Refresh the page.' };
+    if (String(vals[i][ix('sa')]) !== '') return { ok: false, error: 'Round ' + vals[i][ix('round')] + ' is already scored. Refresh the page.' };
+    var pos = P.filter(function (p) { return String(vals[i][p]) === out; })[0];
+    if (pos === undefined) return { ok: false, error: 'A game has changed. Refresh the page.' };
+    var round = String(vals[i][ix('round')]);
+    var busy = vals.some(function (v, j) { return j !== i && String(v[ix('stop')]) === stop.id && String(v[ix('round')]) === round && P.some(function (p) { return String(v[p]) === inId; }); });
+    if (busy || P.some(function (p) { return String(vals[i][p]) === inId; })) return { ok: false, error: 'The fill-in for round ' + round + ' is already playing that round.' };
+    plan.push({ row: i + 2, pos: pos, inId: inId, subs: String(vals[i][ix('subs')] || '') });
+  }
+  plan.forEach(function (x) {
+    ms.getRange(x.row, x.pos + 1).setValue(x.inId);
+    var subs = x.subs ? x.subs.split(',') : []; if (subs.indexOf(x.inId) < 0) subs.push(x.inId);
+    ms.getRange(x.row, ix('subs') + 1).setValue(subs.join(','));
+  });
+  var players = String(stop.players || '').split(',').filter(String);
+  plan.forEach(function (x) { if (players.indexOf(x.inId) < 0) players.push(x.inId); });
+  if (req.leave) players = players.filter(function (id) { return id !== out; });
+  sh.getRange(row, TABS.Stops.indexOf('players') + 1).setValue(players.join(','));
+  sheet('ScoreLog').appendRow([new Date().toISOString(), c.name, stop.id, 'Swapped ' + out + ' out of ' + plan.length + (plan.length === 1 ? ' game' : ' games'), '–', 'swap']);
+  return { ok: true };
+}
+
 // Adds the next round of a Mexicano event once the captain has made it on the website.
 function addRound(req) {
   var c = host(req);
@@ -500,7 +544,7 @@ function readAll() {
     return {
       id: m.id, stop: m.stop, cup: m.cup, round: num(m.round) || 1, time: m.time, court: num(m.court),
       a: [m.a1, m.a2], b: [m.b1, m.b2], sa: num(m.sa), sb: num(m.sb), seq: num(m.seq) || 0,
-      enteredBy: m.enteredBy, updated: m.updated, sets: m.sets
+      enteredBy: m.enteredBy, updated: m.updated, sets: m.sets, subs: m.subs ? String(m.subs).split(',') : []
     };
   });
   var ruleTab = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Rules');

@@ -511,19 +511,31 @@ details.how .rules li{font-size:15.5px}
       ms.forEach(function(m){ (cups[m.cup||"Cup"] = cups[m.cup||"Cup"] || []).push(m); });
       Object.keys(cups).forEach(function(c){
         var list = cups[c]; if (!list.length || !list.every(scored)) return;
-        cupTable(list).slice(0,3).forEach(function(row,i){ var md = medals[row.id] || (medals[row.id] = [0,0,0]); md[i]++; });
+        cupTable(list, stop).slice(0,3).forEach(function(row,i){ var md = medals[row.id] || (medals[row.id] = [0,0,0]); md[i]++; });
       });
     });
     return {R:R, st:st, PR:PR, ps:ps, before:before, beforeP:beforeP, lastStop:lastStop, medals:medals, played:all.length};
   }
-  function cupTable(list){
+  // A cup's standings. A fill-in game (swapped in for an injured or tired player) counts for the Tour Rankings, not
+  // for the fill-in's event total. When players get different numbers of games, rank by the average per game so
+  // nobody loses out for playing less; Tour Stop 1 (no level) keeps the totals it was announced with.
+  function cupTable(list, stop){
     var t = {};
+    list.forEach(function(m){ m.a.concat(m.b).forEach(function(id){ t[id] = t[id] || {id:id, pts:0, w:0, g:0, won:0, all:0, fill:0, own:0}; if (!isSub(m, id)) t[id].own++; }); });
     list.forEach(function(m){ if (!scored(m)) return;
       var wn = winOf(m);
-      m.a.forEach(function(id){ var x = t[id] || (t[id] = {id:id, pts:0, w:0, g:0}); x.pts += m.sa; x.g++; if (wn === 1) x.w++; });
-      m.b.forEach(function(id){ var x = t[id] || (t[id] = {id:id, pts:0, w:0, g:0}); x.pts += m.sb; x.g++; if (wn === 0) x.w++; });
+      [[m.a, m.sa, m.sb, 1], [m.b, m.sb, m.sa, 0]].forEach(function(sd){ sd[0].forEach(function(id){ var x = t[id];
+        if (isSub(m, id)){ x.fill++; return; }
+        x.pts += sd[1]; x.g++; x.won += sd[1]; x.all += sd[1] + sd[2]; if (wn === sd[3]) x.w++; }); });
     });
-    return Object.keys(t).map(function(k){ return t[k]; }).sort(function(a,b){ return b.pts - a.pts || b.w - a.w || nameOf(a.id).localeCompare(nameOf(b.id)); });
+    var rows = Object.keys(t).map(function(k){ return t[k]; }).filter(function(x){ return x.own > 0; });
+    var gs = rows.filter(function(x){ return x.g; }).map(function(x){ return x.g; });
+    var avg = !!(stop && stop.level) && gs.length > 0 && Math.min.apply(null, gs) !== Math.max.apply(null, gs);
+    function av(x){ return x.g ? x.pts / x.g : -1; }
+    rows.sort(avg ? function(a,b){ return av(b) - av(a) || (b.g ? b.w / b.g : 0) - (a.g ? a.w / a.g : 0) || b.pts - a.pts || nameOf(a.id).localeCompare(nameOf(b.id)); }
+      : function(a,b){ return b.pts - a.pts || b.w - a.w || nameOf(a.id).localeCompare(nameOf(b.id)); });
+    rows.avg = avg;
+    return rows;
   }
   function medalStr(md){ if (!md) return ""; var s = ""; if (md[0]) s += "🥇" + (md[0] > 1 ? md[0] : ""); if (md[1]) s += " 🥈" + (md[1] > 1 ? md[1] : ""); if (md[2]) s += " 🥉" + (md[2] > 1 ? md[2] : ""); return s.trim(); }
 
@@ -901,6 +913,7 @@ details.how .rules li{font-size:15.5px}
       });
     });
     if (stop.format === "mexicano" && ms.length && canManage(stop)) main.appendChild(nextRoundCard(stop, ms));
+    if (ms.length && canManage(stop) && ms.some(function(m){ return !scored(m); })) main.appendChild(swapCard(stop, ms));
     if (isAdmin()) main.appendChild(addMatchForm(stop, cups, ms));
     if (ms.length){
       var shs = el("button",{cls:"btn ghost wide", text:"Share " + stop.name + " schedule", onclick:function(){ openShare(scheduleText(stop, cups, byCup)); }});
@@ -920,27 +933,20 @@ details.how .rules li{font-size:15.5px}
     cups.forEach(function(c){ seg.appendChild(el("button",{text:c.replace(/ Cup$/,""), "aria-pressed": UI.cup === c ? "true" : "false", onclick:function(){ UI.cup = c; render(); }})); });
     card.appendChild(seg);
     var list = byCup[UI.cup], done = list.filter(scored).length, final = done === list.length;
-    var t = {};
-    list.forEach(function(m){ m.a.concat(m.b).forEach(function(id){ t[id] = t[id] || {id:id, pts:0, w:0, g:0, won:0, all:0}; }); });
-    list.forEach(function(m){ if (!scored(m)) return;
-      var wn = winOf(m);
-      m.a.forEach(function(id){ var x = t[id]; x.pts += m.sa; x.g++; x.won += m.sa; x.all += m.sa + m.sb; if (wn === 1) x.w++; });
-      m.b.forEach(function(id){ var x = t[id]; x.pts += m.sb; x.g++; x.won += m.sb; x.all += m.sa + m.sb; if (wn === 0) x.w++; });
-    });
-    var rows = Object.keys(t).map(function(k){ return t[k]; }).sort(function(a,b){ return b.pts - a.pts || b.w - a.w || nameOf(a.id).localeCompare(nameOf(b.id)); });
+    var rows = cupTable(list, stop), avg = rows.avg;
     var unit = isGames(stop) ? "games" : "points";
-    card.appendChild(el("p",{cls:"note", text:"Ranked by total " + unit + " won, then by matches won to break a tie. " + (done ? (final ? "Final standings." : done + " of " + list.length + " games scored. Medals are confirmed once every game is in.") : "Standings appear as soon as the first score is in.")}));
+    card.appendChild(el("p",{cls:"note", text:(avg ? "Players had different numbers of games, so the ranking is by average " + unit + " per game, then by share of matches won. " : "Ranked by total " + unit + " won, then by matches won to break a tie. ") + (done ? (final ? "Final standings." : done + " of " + list.length + " games scored. Medals are confirmed once every game is in.") : "Standings appear as soon as the first score is in.")}));
     var md = ["🥇","🥈","🥉"];
     var tb = el("tbody");
     rows.forEach(function(r,i){
       var rk = done && i < 3 ? md[i] : String(i+1);
       tb.appendChild(el("tr",{cls: done && i < 3 ? "podium" : null},[
         el("td",{cls:"rk", text:rk}),
-        el("td",null,[el("b",{text:nameOf(r.id)}), el("div",{cls:"sub", text: r.g ? (r.w + "W from " + r.g + (r.g === 1 ? " game" : " games") + "  ·  " + Math.round(r.won / r.all * 100) + "% of " + unit) : "No games yet"})]),
-        el("td",{cls:"pts", text:String(r.pts)})
+        el("td",null,[el("b",{text:nameOf(r.id)}), el("div",{cls:"sub", text: (r.g ? ((avg ? r.pts + " " + unit + "  ·  " : "") + r.w + "W from " + r.g + (r.g === 1 ? " game" : " games") + "  ·  " + Math.round(r.won / r.all * 100) + "% of " + unit) : "No games yet") + (r.fill ? "  ·  filled in " + r.fill + (r.fill === 1 ? " game" : " games") + " (not counted)" : "")})]),
+        el("td",{cls:"pts", text: avg ? (r.g ? (r.pts / r.g).toFixed(1) : "–") : String(r.pts)})
       ]));
     });
-    var tbl = el("table",{cls:"standings lbt"},[el("thead",null,[el("tr",null,[el("th",{text:"#"}), el("th",{text:"Player"}), el("th",{text: isGames(stop) ? "Games" : "Pts"})])]), tb]);
+    var tbl = el("table",{cls:"standings lbt"},[el("thead",null,[el("tr",null,[el("th",{text:"#"}), el("th",{text:"Player"}), el("th",{text: avg ? "Avg" : (isGames(stop) ? "Games" : "Pts")})])]), tb]);
     card.appendChild(tbl);
     if (done) card.appendChild(el("button",{cls:"btn ghost wide", text:"Share leaderboard", style:"margin-top:12px", onclick:function(){ openShare(stopText(stop, cups, byCup)); }}));
     return card;
@@ -1020,8 +1026,8 @@ details.how .rules li{font-size:15.5px}
 
   function stopText(stop, cups, byCup){
     var out = ["🎾 *" + stop.name.toUpperCase() + "* 🎾", ""]; var md = ["🥇","🥈","🥉"];
-    cups.forEach(function(c){ var t = cupTable(byCup[c]); if (!t.length) return; out.push("*" + c + "*");
-      t.forEach(function(r,i){ out.push((md[i] || (i+1) + ".") + " " + nameOf(r.id) + " – " + r.pts + " pts (" + r.w + "W/" + r.g + "P)"); }); out.push(""); });
+    cups.forEach(function(c){ var t = cupTable(byCup[c], stop); if (!t.length) return; out.push("*" + c + "*");
+      t.forEach(function(r,i){ if (!r.g) return; out.push((md[i] || (i+1) + ".") + " " + nameOf(r.id) + " – " + (t.avg ? (r.pts / r.g).toFixed(1) + " avg, " : "") + r.pts + " pts (" + r.w + "W/" + r.g + "P)"); }); out.push(""); });
     return out.join("\n").trim();
   }
 
@@ -1495,6 +1501,54 @@ details.how .rules li{font-size:15.5px}
     return out;
   }
 
+  function isSub(m, id){ return !!(m.subs && m.subs.indexOf(id) >= 0); }
+  // Swap an injured or tired player out of their unscored games. A resting player fills each one; nothing else changes.
+  function swapCard(stop, ms){
+    var card = el("div",{cls:"card"},[el("h3",{text:"Swap a player"}),
+      el("p",{cls:"note", text:"Someone injured or tired? Only their games change: a resting player fills in, and the rest of the schedule stays the same. Fill-in games count for the Tour Rankings but not for the fill-in's event total."})]);
+    var open = ms.filter(function(m){ return !scored(m); });
+    var outs = {}; open.forEach(function(m){ m.a.concat(m.b).forEach(function(id){ outs[id] = 1; }); });
+    var sw = UI.sw && UI.sw.stop === stop.id ? UI.sw : (UI.sw = {stop:stop.id, out:"", all:true, picks:{}});
+    var who = el("select",{"aria-label":"Who's out"}); who.appendChild(el("option",{value:"", text:"Pick a player"}));
+    Object.keys(outs).sort(function(a, b){ return nameOf(a).localeCompare(nameOf(b)); }).forEach(function(id){ who.appendChild(el("option",{value:id, text:nameOf(id), selected: sw.out === id ? "selected" : null})); });
+    who.addEventListener("change", function(){ sw.out = who.value; sw.picks = {}; commit(); });
+    card.appendChild(el("div",{cls:"field"},[el("label",{text:"Who's out?"}), who]));
+    if (!sw.out || !outs[sw.out]) return card;
+    var seg = el("div",{cls:"seg", role:"group", "aria-label":"How long"});
+    [[false,"Just their next game"],[true,"All their remaining games"]].forEach(function(o){ seg.appendChild(el("button",{text:o[1], "aria-pressed": sw.all === o[0] ? "true" : "false", onclick:function(){ sw.all = o[0]; sw.picks = {}; commit(); }})); });
+    card.appendChild(seg);
+    var mine = open.filter(function(m){ return m.a.concat(m.b).indexOf(sw.out) >= 0; }).sort(function(x, y){ return x.round - y.round || x.court - y.court; });
+    if (!sw.all) mine = mine.slice(0, 1);
+    var pool = {}; (stop.players || []).forEach(function(id){ if (S.players[id]) pool[id] = 1; }); ms.forEach(function(m){ m.a.concat(m.b).forEach(function(id){ pool[id] = 1; }); });
+    var cnt = {}; ms.forEach(function(m){ m.a.concat(m.b).forEach(function(id){ cnt[id] = (cnt[id] || 0) + 1; }); });
+    var extra = {};   // fill-ins already picked above count as one more game, so the work is shared out
+    mine.forEach(function(m){
+      var busy = {}; ms.forEach(function(x){ if (x.round === m.round) x.a.concat(x.b).forEach(function(id){ busy[id] = 1; }); });
+      var rest = Object.keys(pool).filter(function(id){ return !busy[id] && id !== sw.out; }).sort(function(a, b){ return ((cnt[a] || 0) + (extra[a] || 0)) - ((cnt[b] || 0) + (extra[b] || 0)) || nameOf(a).localeCompare(nameOf(b)); });
+      var others = Object.keys(S.players).filter(function(id){ return !pool[id]; }).sort(function(a, b){ return nameOf(a).localeCompare(nameOf(b)); });
+      if (!sw.picks[m.id] || busy[sw.picks[m.id]]) sw.picks[m.id] = rest[0] || "";
+      if (sw.picks[m.id]) extra[sw.picks[m.id]] = (extra[sw.picks[m.id]] || 0) + 1;
+      var sel = el("select",{"aria-label":"Fill-in for round " + m.round});
+      if (!rest.length) sel.appendChild(el("option",{value:"", text:"Nobody is resting"}));
+      var g1 = el("optgroup",{label:"Resting this round"}); rest.forEach(function(id){ g1.appendChild(el("option",{value:id, text:nameOf(id) + " (" + (cnt[id] || 0) + " games)", selected: sw.picks[m.id] === id ? "selected" : null})); });
+      if (rest.length) sel.appendChild(g1);
+      var g2 = el("optgroup",{label:"Not in this event"}); others.forEach(function(id){ g2.appendChild(el("option",{value:id, text:nameOf(id), selected: sw.picks[m.id] === id ? "selected" : null})); });
+      if (others.length) sel.appendChild(g2);
+      sel.addEventListener("change", function(){ sw.picks[m.id] = sel.value; commit(); });
+      card.appendChild(el("div",{cls:"field"},[el("label",{text:"Round " + m.round + ", Court " + m.court + (m.time ? ", " + m.time : "") + ": " + m.a.map(nameOf).join(" / ") + " v " + m.b.map(nameOf).join(" / ")}), sel]));
+    });
+    var msg = el("div",{cls:"msg"});
+    var btn = el("button",{cls:"btn primary wide", text:"Swap " + nameOf(sw.out) + " out", onclick:function(){
+      var swaps = mine.map(function(m){ return {id:m.id, "in":sw.picks[m.id]}; });
+      if (swaps.some(function(x){ return !x["in"]; })){ msg.textContent = "Pick who comes in for every game."; return; }
+      btn.disabled = true; btn.textContent = "Swapping…";
+      hostPost({action:"swapPlayer", stop:stop.id, out:sw.out, swaps:swaps, leave:sw.all}).then(function(res){
+        if (res.ok){ UI.sw = null; load(); } else { btn.disabled = false; btn.textContent = "Swap " + nameOf(sw.out) + " out"; msg.textContent = res.error; }
+      });
+    }});
+    card.appendChild(btn); card.appendChild(msg);
+    return card;
+  }
   function nextRoundCard(stop, ms){
     var card = el("div",{cls:"card"},[el("h3",{text:"Mexicano rounds"})]);
     var last = maxRound(ms), planned = stop.rounds || 0, ready = ms.every(scored);
