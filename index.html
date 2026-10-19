@@ -680,7 +680,6 @@ details.how .rules li{font-size:15.5px}
     if (!stop){ main.appendChild(el("div",{cls:"empty", text:"No games yet. Court Captains can set one up in the Court Captains tab."})); return; }
     if (!live.length) main.appendChild(el("p",{cls:"note", text:"Nothing coming up right now, so here are the latest results. New events appear here as soon as a Court Captain creates them."}));
     renderStopBody(main, stop);
-    visitsCard(main);
   }
 
   // Visitors: counted once per browser visit, with the rough city from the visitor's internet address (no exact location).
@@ -765,6 +764,7 @@ details.how .rules li{font-size:15.5px}
     ]
   }];
   function renderNews(main){
+    visitsCard(main);
     NEWS.forEach(function(n){
       var body = el("div",{cls:"body"},[el("div",{cls:"kicker", text:n.kicker}), el("h2",{text:n.title})]);
       n.intro.forEach(function(t){ body.appendChild(el("p",{text:t})); });
