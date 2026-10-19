@@ -353,6 +353,15 @@ function setPlayers(req) {
   if (players.length < 6) return { ok: false, error: 'A ranked event needs at least 6 players.' };
   var list = req.matches || [], from = parseInt(req.fromRound, 10) || 1;
   if (!list.length) return { ok: false, error: 'Make the schedule first.' };
+  // A last-minute change of level or format, allowed until the first game is scored
+  var level = req.level ? String(req.level) : '', format = req.format ? String(req.format) : '', newName = '';
+  if (level || format) {
+    if (!LEVELS[level] || LEVELS[level].indexOf(format) < 0) return { ok: false, error: 'Pick a level and a format.' };
+    if (level === 'major' && stop.level !== 'major' && !c.admin) return { ok: false, error: 'Only the organiser can run a Major.' };
+    if (rows('Matches').some(function (m) { return m.stop === stop.id && String(m.sa) !== ''; })) return { ok: false, error: 'A game is already scored, so the format can no longer change. Refresh the page.' };
+    newName = cleanText(req.name, 60);
+    if (newName && newName.toLowerCase() !== stop.name.toLowerCase() && rows('Stops').some(function (s) { return s.name.toLowerCase() === newName.toLowerCase(); })) newName = '';
+  }
   var ms = sheet('Matches'), cols = TABS.Matches, n = ms.getLastRow() - 1;
   var vals = n > 0 ? ms.getRange(2, 1, n, cols.length).getValues() : [];
   var iStop = cols.indexOf('stop'), iRound = cols.indexOf('round'), iSa = cols.indexOf('sa'), drop = [];
@@ -371,6 +380,11 @@ function setPlayers(req) {
   if (req.rounds !== undefined) set('rounds', String(parseInt(req.rounds, 10) || ''));
   if (req.courts) set('courts', String(parseInt(req.courts, 10) || 1));
   if (req.time) set('time', cleanText(req.time, 40));
+  if (level) {
+    set('level', level); set('format', format);
+    var total = parseInt(req.total, 10); set('total', isNaN(total) ? '' : String(total));
+    if (newName) set('name', newName);
+  }
   sheet('ScoreLog').appendRow([new Date().toISOString(), c.name, stop.id, 'Set ' + players.length + ' players, ' + out.length + ' games from round ' + from, '–', 'players']);
   return { ok: true };
 }

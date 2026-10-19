@@ -1682,6 +1682,38 @@ details.how .rules li{font-size:15.5px}
     return el("div",{cls:"tpick"},[h, mn, ap]);
   }
 
+  // Level, format, partners, sets and points. Shared by the create form and the event editor.
+  function formatUI(mk, card, field, changed){
+  var seg = el("div",{cls:"seg", role:"group", "aria-label":"Level"});
+  ["social","team","match"].concat(isAdmin() || mk.level === "major" ? ["major"] : []).forEach(function(k){
+    seg.appendChild(el("button",{text:LEVELS[k].label + " " + LEVELS[k].pct, "aria-pressed": mk.level === k ? "true" : "false", onclick:function(){ mk.level = k; if (LEVEL_FORMATS[k].indexOf(mk.format) < 0) mk.format = LEVEL_FORMATS[k][0]; mk.pairs = null; changed(); commit(); }}));
+  });
+  card.appendChild(seg);
+  var fs = LEVEL_FORMATS[mk.level];
+  if (fs.length > 1){
+    var fseg = el("div",{cls:"seg", role:"group", "aria-label":"Format"});
+    fs.forEach(function(f){ fseg.appendChild(el("button",{text:fmtLabel(mk.level, f), "aria-pressed": mk.format === f ? "true" : "false", onclick:function(){ mk.format = f; mk.pairs = null; changed(); commit(); }})); });
+    card.appendChild(fseg);
+  }
+  card.appendChild(el("p",{cls:"note", text:fmtHint(mk.level, mk.format)}));
+  if (isGames(mk)){
+    var rseg = el("div",{cls:"seg", role:"group", "aria-label":"Partners"});
+    [[false,"Same partner"],[true,"Rotate partners"]].forEach(function(o){ rseg.appendChild(el("button",{text:o[1], "aria-pressed": !!mk.rotate === o[0] ? "true" : "false", onclick:function(){ mk.rotate = o[0]; mk.pairs = null; changed(); commit(); }})); });
+    card.appendChild(rseg);
+    if (mk.rotate) card.appendChild(el("p",{cls:"note", text:"Partners change every round, like Americano. The website picks partners so nobody plays with the same person twice if it can help it."}));
+  }
+  if (mk.format === "full"){
+    var sseg2 = el("div",{cls:"seg", role:"group", "aria-label":"Sets"});
+    [["1","1 set"],["3","Best of 3 sets"]].forEach(function(o){ sseg2.appendChild(el("button",{text:o[1], "aria-pressed": (mk.sets || "3") === o[0] ? "true" : "false", onclick:function(){ mk.sets = o[0]; changed(); commit(); }})); });
+    card.appendChild(sseg2);
+  }
+
+  if (FORMATS[mk.format].points){
+    var tt = el("select"); [21,24,32].forEach(function(n){ tt.appendChild(el("option",{value:String(n), text:n + " points", selected: mk.total === n ? "selected" : null})); });
+    tt.addEventListener("change", function(){ mk.total = +tt.value; changed(); commit(); });
+    card.appendChild(field("Points per game", tt));
+  }
+  }
   // With no stop: the create form (where, when, level). With a stop: its players and schedule, which can be changed until the games are scored.
   function createCard(stop){
     var edit = !!stop;
@@ -1719,35 +1751,7 @@ details.how .rules li{font-size:15.5px}
 
     // 1. Level and format
     step("Pick a level and format");
-    var seg = el("div",{cls:"seg", role:"group", "aria-label":"Level"});
-    ["social","team","match"].concat(isAdmin() ? ["major"] : []).forEach(function(k){
-      seg.appendChild(el("button",{text:LEVELS[k].label + " " + LEVELS[k].pct, "aria-pressed": mk.level === k ? "true" : "false", onclick:function(){ mk.level = k; if (LEVEL_FORMATS[k].indexOf(mk.format) < 0) mk.format = LEVEL_FORMATS[k][0]; mk.pairs = null; changed(); commit(); }}));
-    });
-    card.appendChild(seg);
-    var fs = LEVEL_FORMATS[mk.level];
-    if (fs.length > 1){
-      var fseg = el("div",{cls:"seg", role:"group", "aria-label":"Format"});
-      fs.forEach(function(f){ fseg.appendChild(el("button",{text:fmtLabel(mk.level, f), "aria-pressed": mk.format === f ? "true" : "false", onclick:function(){ mk.format = f; mk.pairs = null; changed(); commit(); }})); });
-      card.appendChild(fseg);
-    }
-    card.appendChild(el("p",{cls:"note", text:fmtHint(mk.level, mk.format)}));
-    if (isGames(mk)){
-      var rseg = el("div",{cls:"seg", role:"group", "aria-label":"Partners"});
-      [[false,"Same partner"],[true,"Rotate partners"]].forEach(function(o){ rseg.appendChild(el("button",{text:o[1], "aria-pressed": !!mk.rotate === o[0] ? "true" : "false", onclick:function(){ mk.rotate = o[0]; mk.pairs = null; changed(); commit(); }})); });
-      card.appendChild(rseg);
-      if (mk.rotate) card.appendChild(el("p",{cls:"note", text:"Partners change every round, like Americano. The website picks partners so nobody plays with the same person twice if it can help it."}));
-    }
-    if (mk.format === "full"){
-      var sseg2 = el("div",{cls:"seg", role:"group", "aria-label":"Sets"});
-      [["1","1 set"],["3","Best of 3 sets"]].forEach(function(o){ sseg2.appendChild(el("button",{text:o[1], "aria-pressed": (mk.sets || "3") === o[0] ? "true" : "false", onclick:function(){ mk.sets = o[0]; changed(); commit(); }})); });
-      card.appendChild(sseg2);
-    }
-
-    if (FORMATS[mk.format].points){
-      var tt = el("select"); [21,24,32].forEach(function(n){ tt.appendChild(el("option",{value:String(n), text:n + " points", selected: mk.total === n ? "selected" : null})); });
-      tt.addEventListener("change", function(){ mk.total = +tt.value; changed(); commit(); });
-      card.appendChild(field("Points per game", tt));
-    }
+    formatUI(mk, card, field, changed);
     card.appendChild(el("p",{cls:"note", text:fitNote(mk)}));
     card.appendChild(el("p",{cls:"note", text:"Create the event now and share it in the group. Once sign-ups close, open it from Your events and add the players."}));
     var go = el("button",{cls:"btn primary wide", text:"Create event", onclick:function(){
@@ -1772,6 +1776,10 @@ details.how .rules li{font-size:15.5px}
     card.appendChild(el("p",{cls:"note", text:[fmtDate(stop.date), stop.time, stop.venue].filter(Boolean).join("  ·  ")}));
     card.appendChild(el("div",{cls:"evlevel", text:levelLine(stop) + (isGames(stop) ? (mk.rotate ? " · partners rotate" : " · same partner") : "")}));
     if (scoredMs.length) card.appendChild(el("p",{cls:"note", text:"Games already scored stay as they are. Your changes apply from round " + fromRound + "."}));
+    if (!scoredMs.length){
+      step("Level and format");
+      formatUI(mk, card, field, changed);
+    } else card.appendChild(el("p",{cls:"note", text:"The level, format and points are locked once a game is scored."}));
     var ct2 = el("select"); [1,2,3,4].forEach(function(n){ ct2.appendChild(el("option",{value:String(n), text:n + (n === 1 ? " court" : " courts"), selected: mk.courts === n ? "selected" : null})); });
     ct2.addEventListener("change", function(){ mk.courts = +ct2.value; changed(); commit(); });
     card.appendChild(field("Courts", ct2));
@@ -1964,7 +1972,11 @@ details.how .rules li{font-size:15.5px}
       save.disabled = true; save.textContent = "Saving…";
       var span = timeSpan(mk), req = {action:"setPlayers", stop:stop.id, players:picked, setup:mk.setup, matches:mk.sched, fromRound:fromRound, courts:mk.courts};
       if (span[0]) req.time = addMins(span[0], 0) + (span[1] ? " – " + addMins(span[1], 0) : "");
-      if (mk.format === "mexicano" && fromRound === 1) req.rounds = mk.rounds;
+      if (fromRound === 1) req.rounds = mk.format === "mexicano" ? mk.rounds : "";
+      if (!scoredMs.length && (mk.level !== stop.level || mk.format !== stop.format || (FORMATS[mk.format].points ? mk.total : "") !== (stop.total || ""))){
+        req.level = mk.level; req.format = mk.format; req.total = FORMATS[mk.format].points ? mk.total : "";
+        if (mk.level !== stop.level && LEVELS[stop.level] && stop.name.indexOf(LEVELS[stop.level].label + " ") === 0) req.name = LEVELS[mk.level].label + stop.name.slice(LEVELS[stop.level].label.length);
+      }
       hostPost(req).then(function(res){
         save.disabled = false; save.textContent = "Save";
         if (res.ok){ UI.ed = null; UI.edit = null; UI.tab = "session"; UI.live = stop.id; lsSet("mt-tab", UI.tab); load(); window.scrollTo(0,0); }
