@@ -794,7 +794,16 @@ details.how .rules li{font-size:15.5px}
     }
     var cups = []; var byCup = {};
     ms.forEach(function(m){ var c = m.cup || "Cup"; if (!byCup[c]){ byCup[c] = []; cups.push(c); } byCup[c].push(m); });
-    if (!ms.length) main.appendChild(el("div",{cls:"empty", text: isAdmin() ? "No matches yet. Add them below." : "No matches yet."}));
+    if (!ms.length && stop.level){
+      var su = el("div",{cls:"card"},[el("h3",{text:"Sign-ups are open"}), el("p",{cls:"note", text:"Join in the WhatsApp group" + (stop.closes ? " by " + fmtDate(stop.closes) : "") + ". " + (stop.host || "The Court Captain") + " adds the players and the schedule once sign-ups close."})]);
+      if (canManage(stop)){
+        su.appendChild(el("button",{cls:"btn primary wide", text:"Share the announcement", onclick:function(){ openShare(announceText(stop)); }}));
+        var ap = el("button",{cls:"btn ghost wide", text:"Add players and make the schedule", onclick:function(){ UI.tab = "captains"; UI.edit = stop.id; UI.ed = null; lsSet("mt-tab", UI.tab); render(); var e = document.getElementById("editcard"); if (e) e.scrollIntoView(); }});
+        ap.style.marginTop = "10px"; su.appendChild(ap);
+      }
+      main.appendChild(su);
+    }
+    else if (!ms.length) main.appendChild(el("div",{cls:"empty", text: isAdmin() ? "No matches yet. Add them below." : "No matches yet."}));
     if (cups.length) main.appendChild(leaderboard(stop, cups, byCup));
     if (cups.length){
       var lu = el("div",{cls:"card"},[el("h3",{text:"Players at this event"})]);
@@ -820,11 +829,12 @@ details.how .rules li{font-size:15.5px}
         main.appendChild(matchCard(m, stop));
       });
     });
-    if (stop.format === "mexicano" && canManage(stop)) main.appendChild(nextRoundCard(stop, ms));
+    if (stop.format === "mexicano" && ms.length && canManage(stop)) main.appendChild(nextRoundCard(stop, ms));
     if (isAdmin()) main.appendChild(addMatchForm(stop, cups, ms));
     if (ms.length){
       var shs = el("button",{cls:"btn ghost wide", text:"Share " + stop.name + " schedule", onclick:function(){ openShare(scheduleText(stop, cups, byCup)); }});
       shs.style.marginTop = "12px"; main.appendChild(shs);
+      if (canManage(stop) && stop.level && !isDone(stop)){ var sha = el("button",{cls:"btn ghost wide", text:"Share the player list", onclick:function(){ openShare(announceText(stop)); }}); sha.style.marginTop = "12px"; main.appendChild(sha); }
     }
     if (done){
       var sh = el("button",{cls:"btn ghost wide", text:"Share " + stop.name + " standings", onclick:function(){ openShare(stopText(stop, cups, byCup)); }});
@@ -901,7 +911,7 @@ details.how .rules li{font-size:15.5px}
     if (su.split) out.push("Men play men and ladies play ladies, on their own courts.");
     if (su.mixed) out.push("Mixed doubles: every pair is one man and one lady.");
     if (team) out.push("Keep the same partner all event.");
-    var rot = isGames(stop) && rotates(stop);
+    var rot = isGames(stop) && (su.rotate || rotates(stop));
     if (rot) out.push("Partners change every round, as shown in the schedule.");
     if (!team && su.fixed && su.fixed.length && f !== "team" && FORMATS[f] && (!FORMATS[f].pairs || rot)) out.push("These pairs stay together all event: " + su.fixed.map(function(pr){ return nameOf(pr[0]) + " & " + nameOf(pr[1]); }).join(", ") + ". Everyone else changes partner.");
     if (f === "mexicano" && su.mixed && !team) out.push("Round 1 is set by ranking. After that, men and ladies are ranked apart on the day's standings: the top man partners the 2nd lady, and the 2nd man partners the top lady.");
@@ -1377,9 +1387,45 @@ details.how .rules li{font-size:15.5px}
     });
   }
 
+  function parseTimes(t){
+    var out = [], re = /(\d{1,2}):(\d{2})\s*(am|pm)/gi, m;
+    while ((m = re.exec(t || ""))){ var h = (+m[1] % 12) + (m[3].toLowerCase() === "pm" ? 12 : 0); out.push((h < 10 ? "0" : "") + h + ":" + m[2]); }
+    return out;
+  }
+  function mkFromStop(stop){
+    var su = stop.setup || {}, tm = parseTimes(stop.time);
+    var mk = {stopId:stop.id, level:stop.level || "social", format:stop.format || "americano", start:tm[0] || "", end:tm[1] || "", courts:stop.courts || 2, total:stop.total || 21,
+      rounds:stop.rounds || 0, players:(stop.players || []).filter(function(id){ return S.players[id]; }), split:!!su.split, mx:!!su.mixed, rotate:!!su.rotate,
+      pairs:null, fixed:[], swap:null, sched:null, newName:"", newGender:"M", similar:null, msg:""};
+    if (allPairs(mk)) mk.pairs = (su.fixed || []).map(function(p){ return p.slice(); }); else mk.fixed = (su.fixed || []).map(function(p){ return p.slice(); });
+    return mk;
+  }
+  // The WhatsApp announcement a captain shares: event details, who's in (with their Tour rating) and the open spots.
+  function announceText(stop){
+    var l = LEVELS[stop.level], tm = parseTimes(stop.time), C = compute(), when = "";
+    if (stop.date){ var d = new Date(stop.date + "T00:00:00"); if (!isNaN(d)) when = d.toLocaleDateString("en-GB",{weekday:"long", day:"numeric", month:"short"}); }
+    if (tm[0]){
+      when += (when ? ", " : "") + addMins(tm[0], 0).replace(/(am|pm)$/, " $1");
+      var mins = tm[1] ? toMins(tm[1]) - toMins(tm[0]) : 0; if (mins < 0) mins += 24 * 60;
+      if (mins) when += " (" + mins + "min)";
+    }
+    var ids = (stop.players || []).filter(function(id){ return S.players[id]; });
+    var spots = Math.max(ids.length, (stop.courts || 1) * 4);
+    var lines = ["*" + stop.name.toUpperCase() + "*", ""];
+    if (when) lines.push(" 📅 " + when);
+    if (stop.venue) lines.push(" 📍 " + stop.venue);
+    if (l) lines.push(" " + l.icon + " " + levelLine(stop).replace(/^\S+\s/, "").replace(/\s+·\s+/g, " · "));
+    if (stop.host) lines.push(" 👑 Court Captain: " + stop.host);
+    ids.forEach(function(id){ lines.push(" ✅ " + nameOf(id) + " (" + Math.round(C.R[id] === undefined ? 1000 : C.R[id]) + ")"); });
+    for (var i = ids.length; i < spots; i++) lines.push(" ⚪ ??");
+    lines.push("");
+    lines.push("Reply with your name to join." + (stop.closes ? " Sign-ups close " + fmtDate(stop.closes) + "." : ""));
+    lines.push("https://xzaimzx.github.io/myruh/");
+    return lines.join("\n");
+  }
   function newMk(){
     return {level:"social", format:"americano", venue:"", place:"", name:"", nameEdited:false, date:today(), start:"", end:"",
-      courts:2, total:21, rounds:6, players:[], pairs:null, swap:null, sched:null, newName:"", newGender:"M", similar:null, msg:""};
+      courts:2, total:21, rounds:6, closes:"", players:[], pairs:null, swap:null, sched:null, newName:"", newGender:"M", similar:null, msg:""};
   }
   function eventName(mk){
     var l = LEVELS[mk.level].label, place = (mk.place || "").trim();
@@ -1428,9 +1474,11 @@ details.how .rules li{font-size:15.5px}
     if (!mine.length) ec.appendChild(el("p",{cls:"note", text:"You haven't created an event yet."}));
     mine.forEach(function(s){
       var ms = stopMatches(s.id), dn = ms.filter(scored).length;
-      var stat = isDone(s) ? "Finished" : (dn ? dn + " of " + ms.length + " scored" : "Not started");
+      var stat = isDone(s) ? "Finished" : (dn ? dn + " of " + ms.length + " scored" : (ms.length ? "Not started" : "Sign-ups open" + (s.closes ? " until " + fmtDate(s.closes) : "")));
       var row = el("div",{cls:"evrow"},[el("div",null,[el("b",{text:s.name}), el("div",{cls:"sub", text:[fmtDate(s.date), stat].filter(Boolean).join("  ·  ")})])]);
       var acts = el("div",{cls:"evacts"});
+      if (s.level && !isDone(s)) acts.appendChild(el("button",{cls:"linkbtn", text:"Players", onclick:function(){ UI.edit = s.id; UI.ed = null; render(); var e = document.getElementById("editcard"); if (e) e.scrollIntoView(); }}));
+      if (s.level && !isDone(s)) acts.appendChild(el("button",{cls:"linkbtn", text:"Share", onclick:function(){ openShare(announceText(s)); }}));
       acts.appendChild(el("button",{cls:"linkbtn", text:"Open", onclick:function(){ if (isDone(s) && !liveStops().some(function(x){ return x.id === s.id; })){ UI.tab = "past"; UI.stop = s.id; } else { UI.tab = "session"; UI.live = s.id; } lsSet("mt-tab", UI.tab); render(); window.scrollTo(0,0); }}));
       if (s.level){
         var armed = false;
@@ -1444,6 +1492,7 @@ details.how .rules li{font-size:15.5px}
       row.appendChild(acts); ec.appendChild(row);
     });
     main.appendChild(ec);
+    if (UI.edit && S.stops[UI.edit] && canManage(S.stops[UI.edit])) main.appendChild(createCard(S.stops[UI.edit]));
     main.appendChild(createCard());
   }
 
@@ -1461,16 +1510,20 @@ details.how .rules li{font-size:15.5px}
     return el("div",{cls:"tpick"},[h, mn, ap]);
   }
 
-  function createCard(){
-    var mk = UI.mk || (UI.mk = newMk());
+  // With no stop: the create form (where, when, level). With a stop: its players and schedule, which can be changed until the games are scored.
+  function createCard(stop){
+    var edit = !!stop;
+    var mk = edit ? (UI.ed && UI.ed.stopId === stop.id ? UI.ed : (UI.ed = mkFromStop(stop))) : (UI.mk || (UI.mk = newMk()));
     UI.mkC = null;
-    var card = el("div",{cls:"card"},[el("h3",{text:"Create an event"})]);
+    var card = el("div",{cls:"card", id: edit ? "editcard" : null},[el("h3",{text: edit ? "Players and schedule: " + stop.name : "Create an event"})]);
+    var sms = edit ? stopMatches(stop.id) : [], scoredMs = sms.filter(scored);
+    var fromRound = scoredMs.length ? maxRound(scoredMs) + 1 : 1;
     function changed(){ mk.sched = null; mk.msg = ""; }
     function field(label, input, note){ var f = el("div",{cls:"field"},[el("label",{text:label}), input]); if (note) f.appendChild(el("p",{cls:"note", text:note})); return f; }
 
     var n = 0; function step(t){ card.appendChild(el("div",{cls:"step", text:(++n) + ". " + t})); }
 
-    // 2. Where and when
+    if (!edit){
     step("Where and when");
     var vn = el("input",{type:"text", placeholder:"e.g. Padel In Ar Rabwah", value:mk.venue});
     var pl = el("input",{type:"text", placeholder:"e.g. Ar Rabwah", value:mk.place});
@@ -1488,7 +1541,8 @@ details.how .rules li{font-size:15.5px}
     card.appendChild(el("div",{cls:"grid2"},[field("Court starts", st), field("Court ends", en)]));
     var ct = el("select"); [1,2,3,4].forEach(function(n){ ct.appendChild(el("option",{value:String(n), text:n + (n === 1 ? " court" : " courts"), selected: mk.courts === n ? "selected" : null})); });
     ct.addEventListener("change", function(){ mk.courts = +ct.value; changed(); commit(); });
-    card.appendChild(el("div",{cls:"grid2"},[field("Courts", ct)]));
+    var cl = el("input",{type:"date", value:mk.closes || ""}); cl.addEventListener("input", function(){ mk.closes = cl.value; });
+    card.appendChild(el("div",{cls:"grid2"},[field("Courts", ct), field("Sign-ups close", cl)]));
 
     // 1. Level and format
     step("Pick a level and format");
@@ -1517,7 +1571,33 @@ details.how .rules li{font-size:15.5px}
       card.appendChild(field("Points per game", tt));
     }
     var fit = fitRounds(mk);
-    card.appendChild(el("p",{cls:"note", text: fit ? "A round takes about " + roundMins(mk) + " minutes, so " + fit + (fit === 1 ? " round fits" : " rounds fit") + " in your court time. The schedule is worked out from the players you pick below." : "Add the court start and end times, and the website works out how many rounds fit. You can fill this in on the day, once you know who's playing."}));
+    card.appendChild(el("p",{cls:"note", text: fit ? "A round takes about " + roundMins(mk) + " minutes, so " + fit + (fit === 1 ? " round fits" : " rounds fit") + " in your court time." : "Add the court start and end times, and the website works out how many rounds fit."}));
+    card.appendChild(el("p",{cls:"note", text:"Create the event now and share it in the group. Once sign-ups close, open it from Your events and add the players."}));
+    var go = el("button",{cls:"btn primary wide", text:"Create event", onclick:function(){
+      var name = (mk.nameEdited ? mk.name : eventName(mk)).trim();
+      if (!mk.venue.trim()){ mk.msg = "Type the venue."; commit(); return; }
+      if (!name){ mk.msg = "Give the event a name."; commit(); return; }
+      var time = mk.start ? addMins(mk.start, 0) + (mk.end ? " – " + addMins(mk.end, 0) : "") : "";
+      go.disabled = true; go.textContent = "Creating…";
+      hostPost({action:"createEvent", level:mk.level, format:mk.format, name:name, venue:mk.venue, date:mk.date, time:time, closes:mk.closes || "",
+        total: FORMATS[mk.format].points ? mk.total : "", courts:mk.courts, setup:{rotate: !!(mk.rotate && isGames(mk))}, players:[], matches:[]}).then(function(res){
+        go.disabled = false; go.textContent = "Create event";
+        if (res.ok){ UI.mk = null; UI.tab = "session"; UI.live = res.id; lsSet("mt-tab", UI.tab); load(); window.scrollTo(0,0); }
+        else { mk.msg = res.error; render(); }
+      });
+    }});
+    card.appendChild(el("div",{cls:"msg", text:mk.msg || ""}));
+    card.appendChild(go);
+    return card;
+    }
+
+    // Editing an event: courts can change with turnout
+    card.appendChild(el("p",{cls:"note", text:[fmtDate(stop.date), stop.time, stop.venue].filter(Boolean).join("  ·  ")}));
+    card.appendChild(el("div",{cls:"evlevel", text:levelLine(stop) + (isGames(stop) ? (mk.rotate ? " · partners rotate" : " · same partner") : "")}));
+    if (scoredMs.length) card.appendChild(el("p",{cls:"note", text:"Games already scored stay as they are. Your changes apply from round " + fromRound + "."}));
+    var ct2 = el("select"); [1,2,3,4].forEach(function(n){ ct2.appendChild(el("option",{value:String(n), text:n + (n === 1 ? " court" : " courts"), selected: mk.courts === n ? "selected" : null})); });
+    ct2.addEventListener("change", function(){ mk.courts = +ct2.value; changed(); commit(); });
+    card.appendChild(field("Courts", ct2));
 
     // 3. Players
     var picked = mk.players.filter(function(id){ return S.players[id]; });
@@ -1652,32 +1732,35 @@ details.how .rules li{font-size:15.5px}
         if (mx && mk.pairs.some(function(pr){ return (S.players[pr[0]].gender === "F") === (S.players[pr[1]].gender === "F"); })){ mk.msg = "In mixed doubles, each pair must be one man and one lady."; return false; }
         if (split && mk.pairs.some(function(pr){ return (S.players[pr[0]].gender === "F") !== (S.players[pr[1]].gender === "F"); })){ mk.msg = "When men and ladies are split, each pair must be two men or two ladies."; return false; }
       }
+      var off = fromRound - 1, left = fit ? Math.max(1, fit - off) : 6;
       var fixedNow = needPairs ? mk.pairs : (split ? [] : (mk.fixed || []).filter(function(pr){ return !mx || (S.players[pr[0]].gender === "F") !== (S.players[pr[1]].gender === "F"); }));
       mk.cut = 0;
       var groups = playGroups(picked, split, mk.courts, mx ? "Mixed" : (mk.level === "major" ? "Major" : fmtLabel(mk.level, mk.format)));
       var list = mergeGroups(groups.map(function(g){
         var gp = fixedNow.filter(function(pr){ return g.ids.indexOf(pr[0]) >= 0 && g.ids.indexOf(pr[1]) >= 0; }), l;
-        if (mk.format === "mexicano") l = (mx && !needPairs ? mexicanoMixed : mexicanoRound)(g.ids, g.courts, 1, [], gp);
+        if (mk.format === "mexicano") l = (mx && !needPairs ? mexicanoMixed : mexicanoRound)(g.ids, g.courts, fromRound, scoredMs, gp);
         else if (needPairs){
           l = roundRobin(gp, Math.max(1, Math.min(g.courts, Math.floor(gp.length / 2))));
           var all = maxRound(l);
-          if (fit && all > fit){ mk.cut = Math.max(mk.cut, all); l = l.filter(function(m){ return m.round <= fit; }); }
+          if (fit && all > left){ mk.cut = Math.max(mk.cut, all); l = l.filter(function(m){ return m.round <= left; }); }
         }
-        else if (mx) l = americanoMixed(g.ids, gp, g.courts, fit || 6);
-        else if (gp.length) l = americanoFixed(g.ids, gp, g.courts, fit || 6);
-        else l = americano(g.ids, g.courts, fit || 6);
+        else if (mx) l = americanoMixed(g.ids, gp, g.courts, left);
+        else if (gp.length) l = americanoFixed(g.ids, gp, g.courts, left);
+        else l = americano(g.ids, g.courts, left);
+        if (mk.format !== "mexicano") l.forEach(function(m){ m.round += off; });
         return {cup:g.cup, courts:g.courts, list:l};
       }));
-      if (mk.format === "mexicano") mk.rounds = fit || 6;
-      mk.setup = {split:split, mixed:mx, fixed:fixedNow};
+      if (mk.format === "mexicano" && !off) mk.rounds = fit || 6;
+      mk.setup = {split:split, mixed:mx, rotate: !!(mk.rotate && isGames(mk)), fixed:fixedNow};
       mk.sched = list.map(function(m){ return {round:m.round, court:m.court, time: mk.start ? addMins(mk.start, (m.round - 1) * mins) : "", cup:m.cup, a1:m.a[0], a2:m.a[1], b1:m.b[0], b2:m.b[1]}; });
       mk.msg = ""; return true;
     }
     card.appendChild(el("button",{cls:"btn ghost wide", text: mk.sched ? "Shuffle the schedule again" : "Make the schedule", onclick:function(){ build(); commit(); }}));
     if (mk.sched){
       var rounds = maxRound(mk.sched), pv = el("div",{cls:"preview"});
+      var r0 = mk.sched.reduce(function(x, m){ return Math.min(x, m.round); }, Infinity);
       var playing = {}; mk.sched.forEach(function(m){ [m.a1,m.a2,m.b1,m.b2].forEach(function(id){ playing[id] = (playing[id] || 0) + 1; }); });
-      for (var r = 1; r <= rounds; r++){
+      for (var r = r0; r <= rounds; r++){
         var rm = mk.sched.filter(function(m){ return m.round === r; }), inR = {};
         rm.forEach(function(m){ [m.a1,m.a2,m.b1,m.b2].forEach(function(id){ inR[id] = 1; }); });
         var rest = picked.filter(function(id){ return !inR[id]; });
@@ -1685,28 +1768,25 @@ details.how .rules li{font-size:15.5px}
         rm.forEach(function(m){ pv.appendChild(el("div",{cls:"pvrow", text:"C" + m.court + "  " + (mixed && mk.split ? m.cup + ": " : "") + nameOf(m.a1) + " / " + nameOf(m.a2) + "  v  " + nameOf(m.b1) + " / " + nameOf(m.b2)})); });
       }
       var counts = picked.map(function(id){ return playing[id] || 0; });
-      card.appendChild(el("p",{cls:"note", text: mk.format === "mexicano" ? "This is round 1 of " + mk.rounds + ". You'll make each next round from Game On once the scores are in." : (mk.sched.length + " games over " + rounds + " rounds. Everyone plays " + (Math.min.apply(null, counts) === Math.max.apply(null, counts) ? counts[0] : Math.min.apply(null, counts) + " to " + Math.max.apply(null, counts)) + " games." + (mk.cut ? " Every pair meeting every other pair would take " + mk.cut + " rounds, so only the first " + rounds + " fit in your court time." : (fitRounds(mk) ? "" : " Add the court times above to fit the rounds to your booking.")))}));
+      card.appendChild(el("p",{cls:"note", text: mk.format === "mexicano" ? "This is round " + r0 + (mk.rounds ? " of " + mk.rounds : "") + ". You'll make each next round from Game On once the scores are in." : (mk.sched.length + " games over " + (rounds - r0 + 1) + " rounds. Everyone plays " + (Math.min.apply(null, counts) === Math.max.apply(null, counts) ? counts[0] : Math.min.apply(null, counts) + " to " + Math.max.apply(null, counts)) + " games." + (mk.cut ? " Every pair meeting every other pair would take " + mk.cut + " rounds, so only the first " + rounds + " fit in your court time." : (fitRounds(mk) ? "" : " Add the court times above to fit the rounds to your booking.")))}));
       card.appendChild(pv);
     }
     card.appendChild(smsg);
 
-    // Create
-    var go = el("button",{cls:"btn primary wide", text:"Create event", onclick:function(){
-      var name = (mk.nameEdited ? mk.name : eventName(mk)).trim();
-      if (!mk.venue.trim()){ mk.msg = "Type the venue."; commit(); return; }
-      if (!name){ mk.msg = "Give the event a name."; commit(); return; }
+    // Save
+    var save = el("button",{cls:"btn primary wide", text: sms.length ? "Save changes" : "Save players and schedule", onclick:function(){
       if (!mk.sched && !build()){ commit(); return; }
-      var time = mk.start ? addMins(mk.start, 0) + (mk.end ? " – " + addMins(mk.end, 0) : "") : "";
-      go.disabled = true; go.textContent = "Creating…";
-      hostPost({action:"createEvent", level:mk.level, format:mk.format, name:name, venue:mk.venue, date:mk.date, time:time,
-        total: FORMATS[mk.format].points ? mk.total : "", courts:mk.courts, rounds: mk.format === "mexicano" ? mk.rounds : "", players:picked, setup:mk.setup, matches:mk.sched}).then(function(res){
-        go.disabled = false; go.textContent = "Create event";
-        if (res.ok){ UI.mk = null; UI.tab = "session"; UI.live = res.id; lsSet("mt-tab", UI.tab); load(); window.scrollTo(0,0); }
+      save.disabled = true; save.textContent = "Saving…";
+      var req = {action:"setPlayers", stop:stop.id, players:picked, setup:mk.setup, matches:mk.sched, fromRound:fromRound, courts:mk.courts};
+      if (mk.format === "mexicano" && fromRound === 1) req.rounds = mk.rounds;
+      hostPost(req).then(function(res){
+        save.disabled = false; save.textContent = "Save";
+        if (res.ok){ UI.ed = null; UI.edit = null; UI.tab = "session"; UI.live = stop.id; lsSet("mt-tab", UI.tab); load(); window.scrollTo(0,0); }
         else { mk.msg = res.error; render(); }
       });
     }});
-    card.appendChild(go);
-    if (mk.sched || mk.players.length) card.appendChild(el("button",{cls:"linkbtn", text:"Start over", style:"margin-top:10px", onclick:function(){ UI.mk = null; render(); }}));
+    card.appendChild(save);
+    card.appendChild(el("button",{cls:"linkbtn", text:"Close without saving", style:"margin-top:10px", onclick:function(){ UI.ed = null; UI.edit = null; render(); }}));
     return card;
   }
 
