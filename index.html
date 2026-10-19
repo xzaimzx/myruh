@@ -1501,6 +1501,55 @@ details.how .rules li{font-size:15.5px}
     return out;
   }
 
+  // A suggested setup from who's coming: how many men and ladies, which pairs stay together, the courts and the time.
+  function suggestSetup(mk, picked){
+    var n = picked.length, men = picked.filter(function(id){ return S.players[id].gender !== "F"; }).length, ladies = n - men;
+    var fixed = (mk.fixed || []).filter(function(pr){ return picked.indexOf(pr[0]) >= 0 && picked.indexOf(pr[1]) >= 0; });
+    var singles = n - fixed.length * 2, mixedPairs = fixed.every(function(pr){ return (S.players[pr[0]].gender === "F") !== (S.players[pr[1]].gender === "F"); });
+    var multi = mk.courts > 1 && !usePlan(mk);
+    function est(f, t){
+      var m = {}; for (var k in mk) m[k] = mk[k]; m.format = f; m.total = t;
+      var p = courtPlan(m); if (!p) return null;
+      var seats = p.slots.reduce(function(x, sl){ return x + 4 * Math.min(sl.courts.length, Math.floor(n / 4)); }, 0);
+      return {rounds:p.slots.length, games:seats / n};
+    }
+    var out = {lines:[], set:{}};
+    if (mk.level === "social" || mk.level === "major"){
+      var fmt = men && ladies ? "americano" : (n >= 8 && !fixed.length ? "mexicano" : "americano");
+      var tot = 21, e = est(fmt, 21);
+      if (!e){ out.lines.push("Add the court times first, so the website can work out how many rounds fit."); return out; }
+      [32, 24].some(function(t){ var x = est(fmt, t); if (x && x.games >= 6){ tot = t; e = x; return true; } return false; });
+      out.set.format = fmt; out.set.total = tot;
+      out.title = (fmt === "mexicano" ? "Mexicano" : "Americano") + " to " + tot + " points: " + e.rounds + " rounds, about " + Math.round(e.games) + " games each";
+      if (fmt === "mexicano") out.lines.push("One group of " + (men ? "men" : "ladies") + " with no fixed pairs: Mexicano gives closer games as the event goes on.");
+      else out.lines.push("Americano rotates partners fairly, so everyone plays with and against as many people as possible.");
+      if (men && ladies){
+        var half = Math.ceil(e.rounds / 2);
+        if (fixed.length >= 2 && mixedPairs && men >= 4 && ladies >= 4 && multi){
+          out.set.split = false; out.set.mx = false;
+          out.lines.push("Couples play together for rounds 1–" + half + ". Then, once round " + half + " is scored, open Players, tap Split men and ladies and save, so men play men and ladies play ladies for the rest.");
+        } else if (Math.abs(men - ladies) <= 2 && (!fixed.length || mixedPairs)){
+          out.set.split = false; out.set.mx = true;
+          out.lines.push("Men and ladies are nearly even, so use Mixed doubles only: every pair is one man and one lady" + (men !== ladies ? ", and the extra " + (men > ladies ? "men" : "ladies") + " take turns to rest." : "."));
+        } else {
+          out.set.split = false; out.set.mx = false;
+          out.lines.push("Play together: anyone can partner anyone, which keeps the numbers working with " + men + " men and " + ladies + " ladies.");
+        }
+      }
+      if (fixed.length && singles === 2) out.lines.push("Note: with " + fixed.length + " fixed pairs and only 2 other players, those 2 always partner each other until you split.");
+      var used = Math.min(mk.courts, Math.floor(n / 4)), rest = n - 4 * used;
+      if (rest) out.lines.push(rest + (rest === 1 ? " player rests" : " players rest") + " each round, taking turns." + (used < mk.courts ? " Only " + used + (used === 1 ? " court is" : " courts are") + " needed for " + n + " players." : ""));
+    } else if (mk.level === "match"){
+      var sh = est("short"), f1 = (function(){ var m = {}; for (var k in mk) m[k] = mk[k]; m.format = "full"; m.sets = "1"; var p = courtPlan(m); return p ? p.slots.length : 0; })();
+      if (!sh){ out.lines.push("Add the court times first, so the website can work out how many rounds fit."); return out; }
+      out.set.format = sh.rounds >= 5 || f1 < 3 ? "short" : "full";
+      out.set.rotate = !!(men && ladies && fixed.length);
+      out.title = (out.set.format === "short" ? "Short matches: " + sh.rounds + " rounds" : "1 full set per match: " + f1 + " rounds") + (out.set.rotate ? ", rotating partners" : "");
+      if (out.set.format === "full") out.set.sets = "1";
+      if (out.set.rotate) out.lines.push("Rotate partners keeps the couples together and lets you split men and ladies halfway, like Social.");
+    }
+    return out;
+  }
   function isSub(m, id){ return !!(m.subs && m.subs.indexOf(id) >= 0); }
   // Swap an injured or tired player out of their unscored games. A resting player fills each one; nothing else changes.
   function swapCard(stop, ms){
@@ -1958,6 +2007,17 @@ details.how .rules li{font-size:15.5px}
         else if (mk.fixPick) card.appendChild(el("p",{cls:"note", text:"Now tap " + nameOf(mk.fixPick) + "'s partner."}));
         mk.fixMsg = "";
       }
+    }
+
+    // Suggested setup, once the players and fixed pairs are in
+    if (!scoredMs.length && picked.length >= 6 && (mk.level === "social" || mk.level === "major" || mk.level === "match")){
+      var sg = suggestSetup(mk, picked);
+      var box = el("div",{cls:"warn"},[el("p",null,[el("b",{text:"Suggested: " + (sg.title || "add the court times")})])]);
+      sg.lines.forEach(function(t){ box.appendChild(el("p",{cls:"note", text:t})); });
+      var same = Object.keys(sg.set).every(function(k){ return mk[k] === sg.set[k]; });
+      if (sg.title && !same) box.appendChild(el("button",{cls:"btn ghost", text:"Use this", onclick:function(){ for (var k in sg.set) mk[k] = sg.set[k]; mk.pairs = null; changed(); commit(); }}));
+      else if (sg.title) box.appendChild(el("p",{cls:"note", text:"✓ Your setup matches the suggestion."}));
+      card.appendChild(box);
     }
 
     // 5. Schedule
