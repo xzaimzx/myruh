@@ -129,6 +129,15 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
 .standings td{padding:7px 4px;border-bottom:1px solid var(--line)}
 .standings td:last-child{text-align:right;font-family:Anton,sans-serif;font-size:18px}
 .standings td:first-child{width:30px;color:var(--muted);font-weight:600}
+.rtimes td:first-child{width:auto;color:inherit;font-weight:400}
+.rtimes td:last-child{white-space:nowrap;font-size:16px}
+.rtimes th{text-align:left;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;padding:4px}
+.rtimes th:last-child{text-align:right}
+.visits .big{display:flex;gap:18px;flex-wrap:wrap;margin:4px 0 10px}
+.visits .big div{font-family:Anton,sans-serif;font-size:28px;line-height:1}
+.visits .big small{display:block;font-family:inherit;font-size:12px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;margin-top:4px}
+.vmap{height:220px;border-radius:12px;overflow:hidden;margin:8px 0;background:var(--line)}
+.vcity{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line);font-size:15px}
 .status{margin:14px 0;padding:12px 14px;border-radius:12px;background:var(--chip);font-size:14px}
 .status.bad{border-left:4px solid var(--red)}
 .org{margin-top:28px;border-top:1px solid var(--line);padding-top:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:14px;color:var(--muted)}
@@ -426,6 +435,7 @@ details.how .rules li{font-size:15.5px}
     S.players = P; S.stops = St; S.matches = M;
     S.rules = (data.rules && data.rules.length) ? data.rules : null;
     S.comments = data.comments || null;   // null until the sheet script supports comments
+    S.visits = data.visits || null;       // null until the sheet script counts visits
   }
   function load(quiet){
     if (!configured) return Promise.resolve();
@@ -670,6 +680,64 @@ details.how .rules li{font-size:15.5px}
     if (!stop){ main.appendChild(el("div",{cls:"empty", text:"No games yet. Court Captains can set one up in the Court Captains tab."})); return; }
     if (!live.length) main.appendChild(el("p",{cls:"note", text:"Nothing coming up right now, so here are the latest results. New events appear here as soon as a Court Captain creates them."}));
     renderStopBody(main, stop);
+    visitsCard(main);
+  }
+
+  // Visitors: counted once per browser visit, with the rough city from the visitor's internet address (no exact location).
+  function countVisit(){
+    if (!configured || ssGet("mt-visit")) return;
+    ssSet("mt-visit", "1");
+    var vid = lsGet("mt-vid");
+    if (!vid){ vid = Math.random().toString(36).slice(2, 12) + Date.now().toString(36); lsSet("mt-vid", vid); }
+    function send(g){ post({action:"visit", visitor:vid, city:g.city || "", country:g.country || "", lat:g.lat, lon:g.lon}); }
+    function geo(url, pick){ return fetch(url).then(function(r){ return r.json(); }).then(function(d){ var g = pick(d || {}); if (!g.city) throw 0; return g; }); }
+    geo("https://ipwho.is/?fields=success,city,country,latitude,longitude", function(d){ return d.success === false ? {} : {city:d.city, country:d.country, lat:d.latitude, lon:d.longitude}; })
+      .catch(function(){ return geo("https://ipapi.co/json/", function(d){ return {city:d.city, country:d.country_name, lat:d.latitude, lon:d.longitude}; }); })
+      .then(send, function(){ send({}); });
+  }
+  function visitsCard(main){
+    var v = S.visits; if (!v || !v.visits) return;
+    var cities = v.cities || [];
+    var card = el("div",{cls:"card visits"},[el("h3",{text:"👀 Who's following the tour"}),
+      el("div",{cls:"big"},[el("div",null,[String(v.visits), el("small",{text:"visits"})]), el("div",null,[String(v.visitors), el("small",{text:"people"})]), el("div",null,[String(cities.length), el("small",{text: cities.length === 1 ? "city" : "cities"})])])]);
+    if (cities.length){
+      card.appendChild(visitMap(cities));
+      cities.slice(0, 5).forEach(function(c){ card.appendChild(el("div",{cls:"vcity"},[el("span",{text:c.city + (c.country ? ", " + c.country : "")}), el("b",{text:c.n + " people"})])); });
+    }
+    card.appendChild(el("p",{cls:"note", text:"We count visits and the rough city they come from, nothing more. A city shows once 2 or more people have visited from it."}));
+    main.appendChild(card);
+  }
+  // One map, kept between refreshes so it doesn't reload every 20 seconds. Leaflet loads only when the map scrolls into view.
+  function visitMap(cities){
+    var box = UI.vmap || (UI.vmap = el("div",{cls:"vmap", role:"img", "aria-label":"Map of the cities our visitors come from"}));
+    UI.vcities = cities;
+    if (UI.lmap){ drawCities(); return box; }
+    if (!UI.vwatch && "IntersectionObserver" in window){
+      UI.vwatch = new IntersectionObserver(function(es){ if (es.some(function(e){ return e.isIntersecting; })){ UI.vwatch.disconnect(); loadLeaflet(); } });
+      UI.vwatch.observe(box);
+    } else if (!UI.vwatch){ UI.vwatch = true; loadLeaflet(); }
+    return box;
+  }
+  function loadLeaflet(){
+    var css = document.createElement("link"); css.rel = "stylesheet"; css.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"; document.head.appendChild(css);
+    var js = document.createElement("script"); js.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js";
+    js.onload = function(){
+      UI.lmap = L.map(UI.vmap, {scrollWheelZoom:false, attributionControl:true});
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:12, attribution:"© OpenStreetMap"}).addTo(UI.lmap);
+      drawCities();
+    };
+    document.head.appendChild(js);
+  }
+  function drawCities(){
+    var m = UI.lmap, cs = UI.vcities || []; if (!m || !cs.length) return;
+    if (UI.vlayer) UI.vlayer.remove();
+    var top = cs[0].n;
+    UI.vlayer = L.layerGroup(cs.map(function(c){
+      return L.circleMarker([c.lat, c.lon], {radius:6 + 14 * Math.sqrt(c.n / top), color:"#F28C28", fillColor:"#FFC72C", fillOpacity:.8, weight:2}).bindTooltip(c.city + ": " + c.n);
+    })).addTo(m);
+    var key = cs.map(function(c){ return c.city; }).join("|");
+    if (UI.vkey !== key){ UI.vkey = key; if (cs.length === 1) m.setView([cs[0].lat, cs[0].lon], 9); else m.fitBounds(cs.map(function(c){ return [c.lat, c.lon]; }), {padding:[24,24], maxZoom:9}); }
+    setTimeout(function(){ m.invalidateSize(); }, 50);
   }
 
   // Tour News stories, newest first. Photos live in img/news/.
@@ -921,7 +989,7 @@ details.how .rules li{font-size:15.5px}
     else if (f === "mexicano") out.push(team ? "Round 1 is set by ranking. After that, pairs meet by the day's standings: 1st v 2nd, 3rd v 4th." : "Round 1 is set by ranking. After that, each court pairs 1st and 4th against 2nd and 3rd on the day's standings.");
     if (f === "team") out.push((team ? "" : "Keep the same partner all event. ") + "Every pair plays every other pair.");
     if (f === "short") out = out.concat((rot ? [] : ["Keep the same partner all event."]).concat(["Play exactly 6 games, so scores can be 6–0, 5–1, 4–2 or 3–3.", "Golden point at deuce: the receiving pair picks the side.", "At 3–3, play a tiebreak to 7 points and enter it as 4–3."]));
-    if (f === "full") out = out.concat((rot ? [] : ["Keep the same partner all event."]).concat(["Normal padel sets, 1 set or best of 3, as the Court Captain announced.", "Enter the sets, like 6-4 or 6-4 3-6 7-5."]));
+    if (f === "full") out = out.concat((rot ? [] : ["Keep the same partner all event."]).concat([su.sets === "1" ? "One normal padel set: first to 6 games, 2 clear. At 6–6, play a tiebreak to 7 points." : (su.sets === "3" ? "Best of 3 normal padel sets. At 6–6 in a set, play a tiebreak to 7 points." : "Normal padel sets, 1 set or best of 3, as the Court Captain announced."), "Enter the sets, like 6-4 or 6-4 3-6 7-5."]));
     // Odd totals (21) always have a winner; even totals (24, 32) can end level. The last-point serving rule follows the total.
     var tot = stop.total || 21, even = tot % 2 === 0, half = Math.floor(tot / 2);
     var serveRule = isGames(stop) ? "On match point, men may not serve to ladies." :
@@ -1134,16 +1202,80 @@ details.how .rules li{font-size:15.5px}
   // Rough minutes per round, including the changeover. Used to work out how many rounds fit in the court booking.
   function roundMins(mk){
     if (mk.format === "short") return 25;
-    if (mk.format === "full") return 60;
+    if (mk.format === "full") return mk.sets === "1" ? 40 : 90;
     return mk.total >= 32 ? 20 : (mk.total >= 24 ? 17 : 15);
   }
   function toMins(hhmm){ var p = /^(\d{1,2}):(\d{2})/.exec(hhmm || ""); return p ? (+p[1]) * 60 + (+p[2]) : null; }
-  function fitRounds(mk){
-    var a = toMins(mk.start), b = toMins(mk.end);
-    if (a === null || b === null) return 0;
-    if (b <= a) b += 24 * 60;   // booking past midnight
-    return Math.max(1, Math.min(30, Math.floor((b - a) / roundMins(mk))));
+  // Each court's booking as [start, end]. Court 1 uses the main times; other courts can have their own when booked differently.
+  function courtTimesOf(mk){
+    var out = [];
+    for (var c = 0; c < (mk.courts || 1); c++){
+      var t = c && mk.diffTimes && mk.courtTimes && mk.courtTimes[c - 1];
+      out.push(t && t[0] && t[1] ? t : [mk.start, mk.end]);
+    }
+    return out;
   }
+  // The rounds that fit in the bookings: each round's start time (minutes) and which courts are free for the whole round.
+  function courtPlan(mk){
+    var mins = roundMins(mk), b = courtTimesOf(mk).map(function(t){ var a = toMins(t[0]), e = toMins(t[1]); if (a === null || e === null) return null; if (e <= a) e += 24 * 60; return [a, e]; });
+    if (!b[0] || b.some(function(x){ return !x; })) return null;
+    var lo = Math.min.apply(null, b.map(function(x){ return x[0]; })), hi = Math.max.apply(null, b.map(function(x){ return x[1]; })), slots = [];
+    for (var t = lo; t + mins <= hi && slots.length < 30; t += mins){
+      var on = []; b.forEach(function(x, i){ if (x[0] <= t && t + mins <= x[1]) on.push(i + 1); });
+      if (on.length) slots.push({t:t, courts:on});
+    }
+    return slots.length ? {slots:slots, mins:mins} : null;
+  }
+  function planTime(plan, r){ var s = plan && plan.slots[r - 1]; if (!s) return ""; var h = Math.floor(s.t / 60) % 24, m = s.t % 60; return addMins((h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m, 0); }
+  function fitRounds(mk){ var p = courtPlan(mk); return p ? p.slots.length : 0; }
+  // Only used when courts are booked for different times; otherwise every round uses every court.
+  function usePlan(mk){ return mk.diffTimes && mk.courts > 1 ? courtPlan(mk) : null; }
+  function timeSpan(mk){
+    var b = courtTimesOf(mk).filter(function(t){ return t[0] && t[1]; });
+    if (!b.length) return [mk.start, mk.end];
+    var lo = b[0], hi = b[0];
+    b.forEach(function(t){ if (toMins(t[0]) < toMins(lo[0])) lo = t; if (toMins(t[1]) > toMins(hi[1])) hi = t; });
+    return [lo[0], hi[1]];
+  }
+  function fitNote(mk){
+    var p = courtPlan(mk), mins = roundMins(mk);
+    if (!p) return "Add the court start and end times, and the website works out how many rounds fit.";
+    var txt = "A round takes about " + mins + " minutes, so " + p.slots.length + (p.slots.length === 1 ? " round fits" : " rounds fit") + " in your court time.";
+    if (usePlan(mk)){
+      var per = []; for (var c = 1; c <= mk.courts; c++){ var k = p.slots.filter(function(sl){ return sl.courts.indexOf(c) >= 0; }).length; per.push("Court " + c + ": " + k); }
+      txt += " Rounds per court: " + per.join(", ") + ". When a court's booking ends, fewer games run at once and more players rest.";
+    }
+    return txt;
+  }
+  function eventSetup(mk, extra){
+    var o = {rotate: !!(mk.rotate && isGames(mk))};
+    for (var k in extra) o[k] = extra[k];
+    if (mk.format === "full") o.sets = mk.sets || "3";
+    if (usePlan(mk)) o.courtTimes = courtTimesOf(mk);
+    return o;
+  }
+  // Same time for all courts, or a start and end per court.
+  function courtTimesUI(mk, card, field, changed, edit){
+    if (mk.courts < 2 && !edit) return;
+    if (edit){
+      var st = timePick(mk.start, "Court 1 starts", function(v){ mk.start = v; changed(); commit(); });
+      var en = timePick(mk.end, "Court 1 ends", function(v){ mk.end = v; changed(); commit(); });
+      card.appendChild(el("div",{cls:"grid2"},[field(mk.diffTimes && mk.courts > 1 ? "Court 1 starts" : "Court starts", st), field(mk.diffTimes && mk.courts > 1 ? "Court 1 ends" : "Court ends", en)]));
+      if (mk.courts < 2) return;
+    }
+    var seg = el("div",{cls:"seg", role:"group", "aria-label":"Court times"});
+    [[false,"Same time for all courts"],[true,"Different times per court"]].forEach(function(o){ seg.appendChild(el("button",{text:o[1], "aria-pressed": !!mk.diffTimes === o[0] ? "true" : "false", onclick:function(){ mk.diffTimes = o[0]; if (o[0]) mk.split = false; changed(); commit(); }})); });
+    card.appendChild(seg);
+    if (!mk.diffTimes) return;
+    mk.courtTimes = mk.courtTimes || [];
+    for (var c = 2; c <= mk.courts; c++) (function(i){
+      var t = mk.courtTimes[i] || (mk.courtTimes[i] = [mk.start, mk.end]);
+      var a = timePick(t[0], "Court " + (i + 2) + " starts", function(v){ t[0] = v; changed(); commit(); });
+      var b = timePick(t[1], "Court " + (i + 2) + " ends", function(v){ t[1] = v; changed(); commit(); });
+      card.appendChild(el("div",{cls:"grid2"},[field("Court " + (i + 2) + " starts", a), field("Court " + (i + 2) + " ends", b)]));
+    })(c - 2);
+  }
+  function cAt(courts, r){ return typeof courts === "function" ? courts(r) : courts; }
   function addMins(hhmm, mins){
     var p = /^(\d{1,2}):(\d{2})/.exec(hhmm || ""); if (!p) return "";
     var t = (+p[1]) * 60 + (+p[2]) + mins, h = Math.floor(t / 60) % 24, m = t % 60;
@@ -1152,9 +1284,11 @@ details.how .rules li{font-size:15.5px}
 
   // Americano: every round, the players with the fewest games play, and partners are picked to avoid repeats.
   function americano(players, courts, rounds){
-    var k = Math.min(courts, Math.floor(players.length / 4)), games = {}, pc = {}, oc = {}, out = [];
+    var games = {}, pc = {}, oc = {}, out = [];
     players.forEach(function(p){ games[p] = 0; });
     for (var r = 1; r <= rounds; r++){
+      var k = Math.min(cAt(courts, r), Math.floor(players.length / 4));
+      if (k < 1) continue;
       var play = shuffle(players.slice()).sort(function(a,b){ return games[a] - games[b]; }).slice(0, 4 * k);
       var best = null, bestCost = Infinity;
       for (var t = 0; t < 300 && bestCost > 0; t++){
@@ -1183,16 +1317,16 @@ details.how .rules li{font-size:15.5px}
   function americanoFixed(players, fixed, courts, rounds){
     var inF = {}; fixed.forEach(function(pr){ inF[pr[0]] = inF[pr[1]] = 1; });
     var units = fixed.map(function(pr){ return pr.slice(); }).concat(players.filter(function(p){ return !inF[p]; }).map(function(p){ return [p]; }));
-    var k = Math.min(courts, Math.floor(players.length / 4)), games = {}, pc = {}, oc = {}, out = [];
+    var games = {}, pc = {}, oc = {}, out = [];
     players.forEach(function(p){ games[p] = 0; });
     for (var r = 1; r <= rounds; r++){
-      var kk = k, play = null;
+      var kk = Math.min(cAt(courts, r), Math.floor(players.length / 4)), play = null;
       while (kk > 0 && !play){
         var need = 4 * kk, sel = [], n = 0;
         shuffle(units.slice()).sort(function(a,b){ return games[a[0]] - games[b[0]]; }).forEach(function(u){ if (n + u.length <= need){ sel.push(u); n += u.length; } });
         if (n === need) play = sel; else kk--;
       }
-      if (!play) break;
+      if (!play) continue;
       var fx = play.filter(function(u){ return u.length === 2; }), sg = play.filter(function(u){ return u.length === 1; }).map(function(u){ return u[0]; });
       var best = null, bestCost = Infinity;
       for (var t = 0; t < 300 && bestCost > 0; t++){
@@ -1269,8 +1403,8 @@ details.how .rules li{font-size:15.5px}
     var games = {}, pc = {}, oc = {}, out = [], g = function(p){ return games[p]; };
     players.forEach(function(p){ games[p] = 0; });
     for (var r = 1; r <= rounds; r++){
-      var pk = pickMixed(players, fixed, courts, g);
-      if (!pk.k) break;
+      var pk = pickMixed(players, fixed, cAt(courts, r), g);
+      if (!pk.k) continue;
       var best = null, bestCost = Infinity;
       for (var t = 0; t < 300 && bestCost > 0; t++){
         var l = shuffle(pk.ladies.slice()), teams = pk.fx.slice(), cost = 0, grp = [];
@@ -1350,7 +1484,7 @@ details.how .rules li{font-size:15.5px}
     for (var r = 0; r < n - 1; r++){
       var games = [];
       for (var i = 0; i < n / 2; i++){ if (P[i] && P[n - 1 - i]) games.push([P[i], P[n - 1 - i]]); }
-      for (var j = 0; j < games.length; j += courts){ R++; games.slice(j, j + courts).forEach(function(gm, c){ out.push({round:R, court:c + 1, a:gm[0], b:gm[1]}); }); }
+      for (var j = 0; j < games.length;){ R++; var cap = cAt(courts, R); if (cap < 1) return out; games.slice(j, j + cap).forEach(function(gm, c){ out.push({round:R, court:c + 1, a:gm[0], b:gm[1]}); }); j += cap; }
       P.splice(1, 0, P.pop());
     }
     return out;
@@ -1369,12 +1503,14 @@ details.how .rules li{font-size:15.5px}
     var msg = el("div",{cls:"msg"});
     var btn = el("button",{cls:"btn primary wide", text:"Make round " + (last + 1), disabled: !ready, onclick:function(){
       UI.mkC = null; var players = (stop.players || []).filter(function(id){ return S.players[id]; });
-      var su = stop.setup || {split:false, fixed:[]};
-      var list = mergeGroups(playGroups(players, su.split, stop.courts || 1, ms[0] ? ms[0].cup : "Mexicano").map(function(g){
+      var su = stop.setup || {split:false, fixed:[]}, mk = mkFromStop(stop), plan = usePlan(mk), sl = plan && plan.slots[last];
+      var list = mergeGroups(playGroups(players, su.split, sl ? sl.courts.length : (stop.courts || 1), ms[0] ? ms[0].cup : "Mexicano").map(function(g){
         return {cup:g.cup, courts:g.courts, list:(su.mixed ? mexicanoMixed : mexicanoRound)(g.ids, g.courts, last + 1, ms, su.fixed)};
       }));
+      if (sl) list.forEach(function(m){ m.court = sl.courts[m.court - 1] || m.court; });
+      var tm = plan ? planTime(plan, last + 1) : (mk.start ? addMins(mk.start, last * roundMins(mk)) : "");
       btn.disabled = true; btn.textContent = "Making round " + (last + 1) + "…";
-      hostPost({action:"addRound", stop:stop.id, round:last + 1, matches:list.map(function(m){ return {round:m.round, court:m.court, time:"", cup:m.cup, a1:m.a[0], a2:m.a[1], b1:m.b[0], b2:m.b[1]}; })}).then(function(res){
+      hostPost({action:"addRound", stop:stop.id, round:last + 1, matches:list.map(function(m){ return {round:m.round, court:m.court, time:tm, cup:m.cup, a1:m.a[0], a2:m.a[1], b1:m.b[0], b2:m.b[1]}; })}).then(function(res){
         if (res.ok) load(); else { btn.disabled = false; btn.textContent = "Make round " + (last + 1); msg.textContent = res.error; }
       });
     }});
@@ -1404,9 +1540,10 @@ details.how .rules li{font-size:15.5px}
     return out;
   }
   function mkFromStop(stop){
-    var su = stop.setup || {}, tm = parseTimes(stop.time);
+    var su = stop.setup || {}, tm = su.courtTimes && su.courtTimes[0] ? su.courtTimes[0] : parseTimes(stop.time);
     var mk = {stopId:stop.id, level:stop.level || "social", format:stop.format || "americano", start:tm[0] || "", end:tm[1] || "", courts:stop.courts || 2, total:stop.total || 21,
-      rounds:stop.rounds || 0, players:(stop.players || []).filter(function(id){ return S.players[id]; }), split:!!su.split, mx:!!su.mixed, rotate:!!su.rotate,
+      rounds:stop.rounds || 0, players:(stop.players || []).filter(function(id){ return S.players[id]; }), split:!!su.split, mx:!!su.mixed, rotate:!!su.rotate, sets:su.sets || "3",
+      diffTimes:!!(su.courtTimes && su.courtTimes.length > 1), courtTimes:(su.courtTimes || []).slice(1).map(function(t){ return t.slice(); }),
       pairs:null, fixed:[], swap:null, sched:null, newName:"", newGender:"M", similar:null, msg:""};
     if (allPairs(mk)) mk.pairs = (su.fixed || []).map(function(p){ return p.slice(); }); else mk.fixed = (su.fixed || []).map(function(p){ return p.slice(); });
     return mk;
@@ -1436,7 +1573,7 @@ details.how .rules li{font-size:15.5px}
   }
   function newMk(){
     return {level:"social", format:"americano", venue:"", place:"", name:"", nameEdited:false, date:today(), start:"", end:"",
-      courts:2, total:21, rounds:6, closes:"", players:[], pairs:null, swap:null, sched:null, newName:"", newGender:"M", similar:null, msg:""};
+      courts:2, total:21, rounds:6, closes:"", sets:"3", diffTimes:false, courtTimes:[], players:[], pairs:null, swap:null, sched:null, newName:"", newGender:"M", similar:null, msg:""};
   }
   function eventName(mk){
     var l = LEVELS[mk.level].label, place = (mk.place || "").trim();
@@ -1447,6 +1584,23 @@ details.how .rules li{font-size:15.5px}
   }
   function placeFromVenue(v){ return v.replace(/^\s*padel\s+(in|up|club|hub)?\s*/i, "").trim() || v.trim(); }
 
+  // How long the website allows for each round, so captains can see how the rounds fit their booking.
+  function roundTimesCard(){
+    var rows = [
+      ["Americano or Mexicano, 21 points", 15, "about 12 minutes of play"],
+      ["Americano or Mexicano, 24 points", 17, "about 14 minutes of play"],
+      ["Americano or Mexicano, 32 points", 20, "about 17 minutes of play"],
+      ["Match: short (6 games in total)", 25, "tiebreak at 3–3"],
+      ["Match: 1 full set", 40, "first to 6 games, tiebreak at 6–6"],
+      ["Match: best of 3 sets", 90, "same as Playtomic's 90 minutes"]
+    ];
+    var tb = el("tbody");
+    rows.forEach(function(r){ tb.appendChild(el("tr",null,[el("td",null,[el("b",{text:r[0]}), el("div",{cls:"sub", text:r[2]})]), el("td",{text:r[1] + " min"})])); });
+    return el("div",{cls:"card"},[el("h3",{text:"How long a round takes"}),
+      el("p",{cls:"note", text:"The website uses these times to work out how many rounds fit in your court booking. Each time includes a couple of minutes to change courts."}),
+      el("table",{cls:"standings rtimes"},[el("thead",null,[el("tr",null,[el("th",{text:"Game"}), el("th",{text:"Per round"})])]), tb]),
+      el("p",{cls:"note", text:"Example: courts booked 8:00 to 10:00am (120 minutes) with Americano to 21 points gives 120 ÷ 15 = 8 rounds. If Court 2 is only booked until 9:30am, it hosts 6 of those rounds, and in the last 2 rounds only Court 1 plays while the others rest."})]);
+  }
   function renderCaptains(main){
     var intro = el("div",{cls:"card"},[el("h3",{text:"Court Captains"}),
       el("p",{cls:"note", text:"Captains book the court, pick a level, choose the players, and the website makes the schedule. Every ranked event needs at least 6 players. Ladies-only events are welcome and fully ranked."})]);
@@ -1455,6 +1609,7 @@ details.how .rules li{font-size:15.5px}
     intro.appendChild(grid);
     intro.appendChild(el("p",{cls:"note", text:"The % is how much an event moves the rankings. A win worth +20 in a Match is worth +10 in a Social."}));
     main.appendChild(intro);
+    main.appendChild(roundTimesCard());
 
     if (!isHost()){
       var card = el("div",{cls:"card"},[el("h3",{text:"Unlock captain tools"}), el("p",{cls:"note", text:"Use the Host PIN the organiser gave you. You only need to do this once on this phone."})]);
@@ -1555,11 +1710,12 @@ details.how .rules li{font-size:15.5px}
     card.appendChild(field("Date", dt));
     var st = timePick(mk.start, "Court starts", function(v){ mk.start = v; mk.sched = null; commit(); });
     var en = timePick(mk.end, "Court ends", function(v){ mk.end = v; mk.sched = null; commit(); });
-    card.appendChild(el("div",{cls:"grid2"},[field("Court starts", st), field("Court ends", en)]));
+    card.appendChild(el("div",{cls:"grid2"},[field(mk.diffTimes && mk.courts > 1 ? "Court 1 starts" : "Court starts", st), field(mk.diffTimes && mk.courts > 1 ? "Court 1 ends" : "Court ends", en)]));
     var ct = el("select"); [1,2,3,4].forEach(function(n){ ct.appendChild(el("option",{value:String(n), text:n + (n === 1 ? " court" : " courts"), selected: mk.courts === n ? "selected" : null})); });
     ct.addEventListener("change", function(){ mk.courts = +ct.value; changed(); commit(); });
     var cl = el("input",{type:"date", value:mk.closes || ""}); cl.addEventListener("input", function(){ mk.closes = cl.value; });
     card.appendChild(el("div",{cls:"grid2"},[field("Courts", ct), field("Sign-ups close", cl)]));
+    courtTimesUI(mk, card, field, changed);
 
     // 1. Level and format
     step("Pick a level and format");
@@ -1581,23 +1737,27 @@ details.how .rules li{font-size:15.5px}
       card.appendChild(rseg);
       if (mk.rotate) card.appendChild(el("p",{cls:"note", text:"Partners change every round, like Americano. The website picks partners so nobody plays with the same person twice if it can help it."}));
     }
+    if (mk.format === "full"){
+      var sseg2 = el("div",{cls:"seg", role:"group", "aria-label":"Sets"});
+      [["1","1 set"],["3","Best of 3 sets"]].forEach(function(o){ sseg2.appendChild(el("button",{text:o[1], "aria-pressed": (mk.sets || "3") === o[0] ? "true" : "false", onclick:function(){ mk.sets = o[0]; changed(); commit(); }})); });
+      card.appendChild(sseg2);
+    }
 
     if (FORMATS[mk.format].points){
       var tt = el("select"); [21,24,32].forEach(function(n){ tt.appendChild(el("option",{value:String(n), text:n + " points", selected: mk.total === n ? "selected" : null})); });
       tt.addEventListener("change", function(){ mk.total = +tt.value; changed(); commit(); });
       card.appendChild(field("Points per game", tt));
     }
-    var fit = fitRounds(mk);
-    card.appendChild(el("p",{cls:"note", text: fit ? "A round takes about " + roundMins(mk) + " minutes, so " + fit + (fit === 1 ? " round fits" : " rounds fit") + " in your court time." : "Add the court start and end times, and the website works out how many rounds fit."}));
+    card.appendChild(el("p",{cls:"note", text:fitNote(mk)}));
     card.appendChild(el("p",{cls:"note", text:"Create the event now and share it in the group. Once sign-ups close, open it from Your events and add the players."}));
     var go = el("button",{cls:"btn primary wide", text:"Create event", onclick:function(){
       var name = (mk.nameEdited ? mk.name : eventName(mk)).trim();
       if (!mk.venue.trim()){ mk.msg = "Type the venue."; commit(); return; }
       if (!name){ mk.msg = "Give the event a name."; commit(); return; }
-      var time = mk.start ? addMins(mk.start, 0) + (mk.end ? " – " + addMins(mk.end, 0) : "") : "";
+      var span = timeSpan(mk), time = span[0] ? addMins(span[0], 0) + (span[1] ? " – " + addMins(span[1], 0) : "") : "";
       go.disabled = true; go.textContent = "Creating…";
       hostPost({action:"createEvent", level:mk.level, format:mk.format, name:name, venue:mk.venue, date:mk.date, time:time, closes:mk.closes || "",
-        total: FORMATS[mk.format].points ? mk.total : "", courts:mk.courts, setup:{rotate: !!(mk.rotate && isGames(mk))}, players:[], matches:[]}).then(function(res){
+        total: FORMATS[mk.format].points ? mk.total : "", courts:mk.courts, setup:eventSetup(mk, {}), players:[], matches:[]}).then(function(res){
         go.disabled = false; go.textContent = "Create event";
         if (res.ok){ UI.mk = null; UI.tab = "session"; UI.live = res.id; lsSet("mt-tab", UI.tab); load(); window.scrollTo(0,0); }
         else { mk.msg = res.error; render(); }
@@ -1615,6 +1775,8 @@ details.how .rules li{font-size:15.5px}
     var ct2 = el("select"); [1,2,3,4].forEach(function(n){ ct2.appendChild(el("option",{value:String(n), text:n + (n === 1 ? " court" : " courts"), selected: mk.courts === n ? "selected" : null})); });
     ct2.addEventListener("change", function(){ mk.courts = +ct2.value; changed(); commit(); });
     card.appendChild(field("Courts", ct2));
+    courtTimesUI(mk, card, field, changed, true);
+    card.appendChild(el("p",{cls:"note", text:fitNote(mk)}));
 
     // 3. Players
     var picked = mk.players.filter(function(id){ return S.players[id]; });
@@ -1666,7 +1828,7 @@ details.how .rules li{font-size:15.5px}
       step("Men and ladies");
       var sseg = el("div",{cls:"seg", role:"group", "aria-label":"Men and ladies"});
       var mode = mk.split ? "split" : (mk.mx ? "mixed" : "together");
-      [["together","Play together"],["mixed","Mixed doubles only"],["split","Split men and ladies"]].forEach(function(o){ sseg.appendChild(el("button",{text:o[1], "aria-pressed": mode === o[0] ? "true" : "false", onclick:function(){ mk.split = o[0] === "split"; mk.mx = o[0] === "mixed"; mk.pairs = null; changed(); commit(); }})); });
+      [["together","Play together"],["mixed","Mixed doubles only"]].concat(usePlan(mk) ? [] : [["split","Split men and ladies"]]).forEach(function(o){ sseg.appendChild(el("button",{text:o[1], "aria-pressed": mode === o[0] ? "true" : "false", onclick:function(){ mk.split = o[0] === "split"; mk.mx = o[0] === "mixed"; mk.pairs = null; changed(); commit(); }})); });
       card.appendChild(sseg);
       var sp = mk.split ? splitProblem(picked, mk.courts) : (mk.mx ? mixedProblem(picked, allPairs(mk)) : "");
       card.appendChild(el("p",{cls: sp ? "note warntext" : "note", text: sp || (mk.split ? "Men only play men and ladies only play ladies, on their own courts. Each group gets its own leaderboard." : (mk.mx ? "Every pair is one man and one lady. If the numbers aren't equal, the extra players take turns to rest." : "Anyone can partner anyone."))}));
@@ -1741,7 +1903,8 @@ details.how .rules li{font-size:15.5px}
     var smsg = el("div",{cls:"msg", text:mk.msg || ""});
     function build(){
       if (picked.length < 6){ mk.msg = "A ranked event needs at least 6 players."; return false; }
-      var fit = fitRounds(mk), mins = roundMins(mk), split = !!(mixed && mk.split), mx = !!(mixed && mk.mx);
+      var fit = fitRounds(mk), mins = roundMins(mk), split = !!(mixed && mk.split), mx = !!(mixed && mk.mx), plan = usePlan(mk);
+      if (split && plan){ mk.msg = "Splitting men and ladies needs the same court times for all courts."; return false; }
       if (split){ var sp = splitProblem(picked, mk.courts); if (sp){ mk.msg = sp; return false; } }
       if (mx){ var mp = mixedProblem(picked, needPairs); if (mp){ mk.msg = mp; return false; } }
       if (needPairs){
@@ -1752,24 +1915,29 @@ details.how .rules li{font-size:15.5px}
       var off = fromRound - 1, left = fit ? Math.max(1, fit - off) : 6;
       var fixedNow = needPairs ? mk.pairs : (split ? [] : (mk.fixed || []).filter(function(pr){ return !mx || (S.players[pr[0]].gender === "F") !== (S.players[pr[1]].gender === "F"); }));
       mk.cut = 0;
+      // With different court times, each round only uses the courts still booked then
+      var cfn = plan ? function(r){ var sl = plan.slots[r - 1 + off]; return sl ? sl.courts.length : 0; } : null;
       var groups = playGroups(picked, split, mk.courts, mx ? "Mixed" : (mk.level === "major" ? "Major" : fmtLabel(mk.level, mk.format)));
       var list = mergeGroups(groups.map(function(g){
         var gp = fixedNow.filter(function(pr){ return g.ids.indexOf(pr[0]) >= 0 && g.ids.indexOf(pr[1]) >= 0; }), l;
-        if (mk.format === "mexicano") l = (mx && !needPairs ? mexicanoMixed : mexicanoRound)(g.ids, g.courts, fromRound, scoredMs, gp);
+        var gc = cfn ? function(r){ return Math.min(cfn(r), Math.floor(gp.length / 2)); } : Math.max(1, Math.min(g.courts, Math.floor(gp.length / 2)));
+        if (mk.format === "mexicano") l = (mx && !needPairs ? mexicanoMixed : mexicanoRound)(g.ids, cfn ? Math.max(1, cfn(1)) : g.courts, fromRound, scoredMs, gp);
         else if (needPairs){
-          l = roundRobin(gp, Math.max(1, Math.min(g.courts, Math.floor(gp.length / 2))));
+          l = roundRobin(gp, gc);
           var all = maxRound(l);
           if (fit && all > left){ mk.cut = Math.max(mk.cut, all); l = l.filter(function(m){ return m.round <= left; }); }
         }
-        else if (mx) l = americanoMixed(g.ids, gp, g.courts, left);
-        else if (gp.length) l = americanoFixed(g.ids, gp, g.courts, left);
-        else l = americano(g.ids, g.courts, left);
+        else if (mx) l = americanoMixed(g.ids, gp, cfn || g.courts, left);
+        else if (gp.length) l = americanoFixed(g.ids, gp, cfn || g.courts, left);
+        else l = americano(g.ids, cfn || g.courts, left);
         if (mk.format !== "mexicano") l.forEach(function(m){ m.round += off; });
         return {cup:g.cup, courts:g.courts, list:l};
       }));
       if (mk.format === "mexicano" && !off) mk.rounds = fit || 6;
-      mk.setup = {split:split, mixed:mx, rotate: !!(mk.rotate && isGames(mk)), fixed:fixedNow};
-      mk.sched = list.map(function(m){ return {round:m.round, court:m.court, time: mk.start ? addMins(mk.start, (m.round - 1) * mins) : "", cup:m.cup, a1:m.a[0], a2:m.a[1], b1:m.b[0], b2:m.b[1]}; });
+      mk.setup = eventSetup(mk, {split:split, mixed:mx, fixed:fixedNow});
+      mk.sched = list.map(function(m){
+        var sl = plan && plan.slots[m.round - 1], court = sl && sl.courts[m.court - 1] ? sl.courts[m.court - 1] : m.court;
+        return {round:m.round, court:court, time: plan ? planTime(plan, m.round) : (mk.start ? addMins(mk.start, (m.round - 1) * mins) : ""), cup:m.cup, a1:m.a[0], a2:m.a[1], b1:m.b[0], b2:m.b[1]}; });
       mk.msg = ""; return true;
     }
     card.appendChild(el("button",{cls:"btn ghost wide", text: mk.sched ? "Shuffle the schedule again" : "Make the schedule", onclick:function(){ build(); commit(); }}));
@@ -1794,7 +1962,8 @@ details.how .rules li{font-size:15.5px}
     var save = el("button",{cls:"btn primary wide", text: sms.length ? "Save changes" : "Save players and schedule", onclick:function(){
       if (!mk.sched && !build()){ commit(); return; }
       save.disabled = true; save.textContent = "Saving…";
-      var req = {action:"setPlayers", stop:stop.id, players:picked, setup:mk.setup, matches:mk.sched, fromRound:fromRound, courts:mk.courts};
+      var span = timeSpan(mk), req = {action:"setPlayers", stop:stop.id, players:picked, setup:mk.setup, matches:mk.sched, fromRound:fromRound, courts:mk.courts};
+      if (span[0]) req.time = addMins(span[0], 0) + (span[1] ? " – " + addMins(span[1], 0) : "");
       if (mk.format === "mexicano" && fromRound === 1) req.rounds = mk.rounds;
       hostPost(req).then(function(res){
         save.disabled = false; save.textContent = "Save";
@@ -1904,6 +2073,7 @@ details.how .rules li{font-size:15.5px}
   try { var cached = JSON.parse(lsGet("mt-cache") || "null"); if (cached && cached.ok && configured){ apply(cached); S.state = "ready"; } } catch(e){}
   render();
   load();
+  countVisit();
   setInterval(function(){ if (!document.hidden) load(true); }, 20000);
   document.addEventListener("visibilitychange", function(){ if (!document.hidden) load(true); });
 })();

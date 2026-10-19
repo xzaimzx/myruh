@@ -22,6 +22,7 @@ var TABS = {
   Settings: ['key', 'value', 'note'],
   Rules: ['rule'],
   Comments: ['id', 'article', 'time', 'name', 'text'],
+  Visitors: ['time', 'visitor', 'city', 'country', 'lat', 'lon'],
   Captains: ['name', 'pin', 'note']
 };
 
@@ -175,6 +176,7 @@ function handle(req) {
     case 'createEvent': return createEvent(req);
     case 'addRound': return addRound(req);
     case 'setPlayers': return setPlayers(req);
+    case 'visit': return addVisit(req);
     case 'deleteEvent': return deleteEvent(req);
     case 'addStop': return admin(req) || addStop(req);
     case 'addMatch': return admin(req) || addMatch(req);
@@ -298,12 +300,44 @@ function setupText(setup, players) {
     var a = String(pr[0]), b = String(pr[1]);
     if (a !== b && players.indexOf(a) >= 0 && players.indexOf(b) >= 0 && !used[a] && !used[b]) { used[a] = used[b] = 1; fixed.push([a, b]); }
   });
-  if (!setup.split && !setup.mixed && !setup.rotate && !fixed.length) return '';
-  return JSON.stringify({ split: !!setup.split, mixed: !setup.split && !!setup.mixed, rotate: !!setup.rotate, fixed: fixed });
+  var hm = /^\d{1,2}:\d{2}$/, times = (setup.courtTimes || []).slice(0, 8).filter(function (t) { return t && hm.test(t[0]) && hm.test(t[1]); }).map(function (t) { return [t[0], t[1]]; });
+  var sets = setup.sets === '1' || setup.sets === '3' ? setup.sets : '';
+  if (!setup.split && !setup.mixed && !setup.rotate && !fixed.length && !times.length && !sets) return '';
+  var o = { split: !!setup.split, mixed: !setup.split && !!setup.mixed, rotate: !!setup.rotate, fixed: fixed };
+  if (times.length) o.courtTimes = times;
+  if (sets) o.sets = sets;
+  return JSON.stringify(o);
 }
 
 function parseSetup(text) {
-  try { var o = JSON.parse(text); return { split: !!o.split, mixed: !!o.mixed, rotate: !!o.rotate, fixed: o.fixed || [] }; } catch (e) { return { split: false, fixed: [] }; }
+  try { var o = JSON.parse(text); return { split: !!o.split, mixed: !!o.mixed, rotate: !!o.rotate, fixed: o.fixed || [], courtTimes: o.courtTimes || null, sets: o.sets || '' }; } catch (e) { return { split: false, fixed: [] }; }
+}
+
+// One row per visit: a random id for the browser (not a person), and the rough city from the visitor's connection. No IP addresses are stored.
+function addVisit(req) {
+  var vid = String(req.visitor || '').replace(/[^a-z0-9]/gi, '').slice(0, 24);
+  if (!vid) return { ok: false, error: 'Bad request.' };
+  var num = function (x, lim) { var n = parseFloat(x); return isNaN(n) || Math.abs(n) > lim ? '' : String(Math.round(n * 100) / 100); };
+  ensureTab('Visitors').appendRow([new Date().toISOString(), vid, cleanText(req.city, 40), cleanText(req.country, 40), num(req.lat, 90), num(req.lon, 180)]);
+  return { ok: true };
+}
+
+// Totals for the homepage: visits, different visitors, and cities with 2 or more visitors (so nobody can be singled out).
+function visitStats() {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Visitors');
+  if (!sh) return { visits: 0, visitors: 0, cities: [] };
+  var list = rows('Visitors'), seen = {}, byCity = {};
+  list.forEach(function (v) {
+    seen[v.visitor] = 1;
+    if (!v.city) return;
+    var k = v.city + '|' + v.country;
+    var c = byCity[k] || (byCity[k] = { city: v.city, country: v.country, lat: parseFloat(v.lat), lon: parseFloat(v.lon), who: {} });
+    c.who[v.visitor] = 1;
+  });
+  var cities = Object.keys(byCity).map(function (k) { var c = byCity[k]; return { city: c.city, country: c.country, lat: c.lat, lon: c.lon, n: Object.keys(c.who).length }; })
+    .filter(function (c) { return c.n >= 2 && !isNaN(c.lat) && !isNaN(c.lon); })
+    .sort(function (a, b) { return b.n - a.n; });
+  return { visits: list.length, visitors: Object.keys(seen).length, cities: cities };
 }
 
 // Sets or changes an event's players and schedule. Scored games are kept; unscored games from fromRound on are replaced.
@@ -336,6 +370,7 @@ function setPlayers(req) {
   set('setup', setupText(req.setup, players));
   if (req.rounds !== undefined) set('rounds', String(parseInt(req.rounds, 10) || ''));
   if (req.courts) set('courts', String(parseInt(req.courts, 10) || 1));
+  if (req.time) set('time', cleanText(req.time, 40));
   sheet('ScoreLog').appendRow([new Date().toISOString(), c.name, stop.id, 'Set ' + players.length + ' players, ' + out.length + ' games from round ' + from, '–', 'players']);
   return { ok: true };
 }
@@ -458,7 +493,7 @@ function readAll() {
   var rules = ruleTab ? rows('Rules').map(function (r) { return r.rule; }).filter(String) : null;
   ensureTab('Comments');
   var comments = rows('Comments').map(function (c) { return { id: c.id, article: c.article, time: c.time, name: c.name, text: c.text.replace(/^'(?=[=+\-@])/, '') }; });
-  return { ok: true, players: players, stops: stops, matches: matches, rules: rules, comments: comments };
+  return { ok: true, players: players, stops: stops, matches: matches, rules: rules, comments: comments, visits: visitStats() };
 }
 
 function rows(tab) {
