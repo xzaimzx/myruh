@@ -1483,9 +1483,9 @@ details.how .rules li{font-size:15.5px}
       if (s.level){
         var armed = false;
         var del = el("button",{cls:"del", text:"Delete", onclick:function(){
-          if (!armed){ armed = true; del.textContent = "Tap again to delete"; setTimeout(function(){ armed = false; del.textContent = "Delete"; }, 3000); return; }
+          if (!armed){ armed = true; del.textContent = "Tap again to delete"; setTimeout(function(){ armed = false; del.textContent = "Delete"; }, 6000); return; }
           del.disabled = true; del.textContent = "Deleting…";
-          hostPost({action:"deleteEvent", stop:s.id}).then(function(res){ if (res.ok){ delete S.stops[s.id]; render(); load(true); } else { del.disabled = false; del.textContent = "Delete"; toast(res.error); } });
+          hostPost({action:"deleteEvent", stop:s.id}).then(function(res){ if (res.ok){ delete S.stops[s.id]; render(); load(true); } else { del.disabled = false; del.textContent = "Delete"; row.appendChild(el("div",{cls:"msg", text:"Couldn't delete: " + (res.error || "no answer from the sheet. Check your connection and try again.")})); } });
         }});
         acts.appendChild(del);
       }
