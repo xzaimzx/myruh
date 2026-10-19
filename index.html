@@ -351,7 +351,7 @@ details.how .rules li{font-size:15.5px}
   var LEVELS = {
     social: {label:"Social", value:0.5, pct:"50%", icon:"🔄", blurb:"Partners rotate. Americano or Mexicano."},
     team:   {label:"Team", value:0.75, pct:"75%", icon:"🤝", blurb:"Same partner all event. Americano or Mexicano, scored in points."},
-    match:  {label:"Match", value:1, pct:"100%", icon:"🎾", blurb:"Same partner, real padel scoring. Short (6 games) or full sets."},
+    match:  {label:"Match", value:1, pct:"100%", icon:"🎾", blurb:"Real padel scoring, same partner or rotating. Short (6 games) or full sets."},
     major:  {label:"Major", value:1.5, pct:"150%", icon:"🏆", blurb:"Special events run by the organiser."}
   };
   var LEVEL_FORMATS = {social:["americano","mexicano"], team:["team","mexicano"], match:["short","full"], major:["americano","mexicano","team","short","full"]};
@@ -369,7 +369,12 @@ details.how .rules li{font-size:15.5px}
     if (level === "team" && f === "mexicano") return "Same partner all event. Round 1 is set by ranking. After each round you tap Make next round, and pairs meet by the day's standings: 1st v 2nd, 3rd v 4th.";
     return FORMATS[f].hint;
   }
-  function allPairs(mk){ return FORMATS[mk.format].pairs || mk.level === "team"; }
+  function allPairs(mk){ return (FORMATS[mk.format].pairs && !(mk.rotate && isGames(mk))) || mk.level === "team"; }
+  // A Match can rotate partners like Americano. Nothing extra is saved for that, so it's read from the games: does anyone have more than one partner?
+  function rotates(stop){
+    var pt = {}, ms = stopMatches(stop.id);
+    return ms.some(function(m){ return [m.a, m.b].some(function(t){ return t.some(function(id, i){ var o = t[1 - i]; if (pt[id] && pt[id] !== o) return true; pt[id] = o; return false; }); }); });
+  }
   function makePairs(ids, split, random, mx){
     var mk2 = function(g){ if (!random) return balancedPairs(g); var s = shuffle(g.slice()), out = []; for (var i = 0; i + 1 < s.length; i += 2) out.push([s[i], s[i+1]]); return out; };
     if (mx){
@@ -896,12 +901,14 @@ details.how .rules li{font-size:15.5px}
     if (su.split) out.push("Men play men and ladies play ladies, on their own courts.");
     if (su.mixed) out.push("Mixed doubles: every pair is one man and one lady.");
     if (team) out.push("Keep the same partner all event.");
-    else if (su.fixed && su.fixed.length && f !== "team" && FORMATS[f] && !FORMATS[f].pairs) out.push("These pairs stay together all event: " + su.fixed.map(function(pr){ return nameOf(pr[0]) + " & " + nameOf(pr[1]); }).join(", ") + ". Everyone else changes partner.");
+    var rot = isGames(stop) && rotates(stop);
+    if (rot) out.push("Partners change every round, as shown in the schedule.");
+    if (!team && su.fixed && su.fixed.length && f !== "team" && FORMATS[f] && (!FORMATS[f].pairs || rot)) out.push("These pairs stay together all event: " + su.fixed.map(function(pr){ return nameOf(pr[0]) + " & " + nameOf(pr[1]); }).join(", ") + ". Everyone else changes partner.");
     if (f === "mexicano" && su.mixed && !team) out.push("Round 1 is set by ranking. After that, men and ladies are ranked apart on the day's standings: the top man partners the 2nd lady, and the 2nd man partners the top lady.");
     else if (f === "mexicano") out.push(team ? "Round 1 is set by ranking. After that, pairs meet by the day's standings: 1st v 2nd, 3rd v 4th." : "Round 1 is set by ranking. After that, each court pairs 1st and 4th against 2nd and 3rd on the day's standings.");
     if (f === "team") out.push((team ? "" : "Keep the same partner all event. ") + "Every pair plays every other pair.");
-    if (f === "short") out = out.concat(["Keep the same partner all event.", "Play exactly 6 games, so scores can be 6–0, 5–1, 4–2 or 3–3.", "Golden point at deuce: the receiving pair picks the side.", "At 3–3, play a tiebreak to 7 points and enter it as 4–3."]);
-    if (f === "full") out = out.concat(["Keep the same partner all event.", "Normal padel sets, 1 set or best of 3, as the Court Captain announced.", "Enter the sets, like 6-4 or 6-4 3-6 7-5."]);
+    if (f === "short") out = out.concat((rot ? [] : ["Keep the same partner all event."]).concat(["Play exactly 6 games, so scores can be 6–0, 5–1, 4–2 or 3–3.", "Golden point at deuce: the receiving pair picks the side.", "At 3–3, play a tiebreak to 7 points and enter it as 4–3."]));
+    if (f === "full") out = out.concat((rot ? [] : ["Keep the same partner all event."]).concat(["Normal padel sets, 1 set or best of 3, as the Court Captain announced.", "Enter the sets, like 6-4 or 6-4 3-6 7-5."]));
     if (FORMATS[f].points) base.forEach(function(r){
       if (/^Every game is \d+ points/.test(r)){ if (stop.total) out.push("Every game is " + stop.total + " points in total. No draws."); }
       else out.push(r);
@@ -1497,6 +1504,12 @@ details.how .rules li{font-size:15.5px}
       card.appendChild(fseg);
     }
     card.appendChild(el("p",{cls:"note", text:fmtHint(mk.level, mk.format)}));
+    if (isGames(mk)){
+      var rseg = el("div",{cls:"seg", role:"group", "aria-label":"Partners"});
+      [[false,"Same partner"],[true,"Rotate partners"]].forEach(function(o){ rseg.appendChild(el("button",{text:o[1], "aria-pressed": !!mk.rotate === o[0] ? "true" : "false", onclick:function(){ mk.rotate = o[0]; mk.pairs = null; changed(); commit(); }})); });
+      card.appendChild(rseg);
+      if (mk.rotate) card.appendChild(el("p",{cls:"note", text:"Partners change every round, like Americano. The website picks partners so nobody plays with the same person twice if it can help it."}));
+    }
 
     if (FORMATS[mk.format].points){
       var tt = el("select"); [21,24,32].forEach(function(n){ tt.appendChild(el("option",{value:String(n), text:n + " points", selected: mk.total === n ? "selected" : null})); });
@@ -1550,7 +1563,7 @@ details.how .rules li{font-size:15.5px}
     card.appendChild(nmsg);
 
     // Men and ladies: play together, or split into two groups that play apart
-    var mixed = mk.level !== "match" && men > 0 && men < picked.length;
+    var mixed = (mk.level !== "match" || !allPairs(mk)) && men > 0 && men < picked.length;
     if (!mixed){ mk.split = false; mk.mx = false; }
     if (mixed){
       step("Men and ladies");
