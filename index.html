@@ -1481,15 +1481,21 @@ details.how .rules li{font-size:15.5px}
       if (s.level && !isDone(s)) acts.appendChild(el("button",{cls:"linkbtn", text:"Share", onclick:function(){ openShare(announceText(s)); }}));
       acts.appendChild(el("button",{cls:"linkbtn", text:"Open", onclick:function(){ if (isDone(s) && !liveStops().some(function(x){ return x.id === s.id; })){ UI.tab = "past"; UI.stop = s.id; } else { UI.tab = "session"; UI.live = s.id; } lsSet("mt-tab", UI.tab); render(); window.scrollTo(0,0); }}));
       if (s.level){
-        var armed = false;
-        var del = el("button",{cls:"del", text:"Delete", onclick:function(){
-          if (!armed){ armed = true; del.textContent = "Tap again to delete"; setTimeout(function(){ armed = false; del.textContent = "Delete"; }, 6000); return; }
-          del.disabled = true; del.textContent = "Deleting…";
-          hostPost({action:"deleteEvent", stop:s.id}).then(function(res){ if (res.ok){ delete S.stops[s.id]; render(); load(true); } else { del.disabled = false; del.textContent = "Delete"; row.appendChild(el("div",{cls:"msg", text:"Couldn't delete: " + (res.error || "no answer from the sheet. Check your connection and try again.")})); } });
+        // The "tap again" state lives in UI, so the page refreshing in the background doesn't undo the first tap.
+        var armed = UI.delArm && UI.delArm.id === s.id && Date.now() < UI.delArm.until;
+        var del = el("button",{cls:"del", text: UI.delBusy === s.id ? "Deleting…" : (armed ? "Tap again to delete" : "Delete"), disabled: UI.delBusy === s.id ? "disabled" : null, onclick:function(){
+          if (!(UI.delArm && UI.delArm.id === s.id && Date.now() < UI.delArm.until)){ UI.delArm = {id:s.id, until:Date.now() + 8000}; UI.delMsg = null; del.textContent = "Tap again to delete"; setTimeout(function(){ if (UI.delArm && UI.delArm.id === s.id && Date.now() >= UI.delArm.until){ UI.delArm = null; render(); } }, 8100); return; }
+          UI.delArm = null; UI.delBusy = s.id; del.disabled = true; del.textContent = "Deleting…";
+          hostPost({action:"deleteEvent", stop:s.id}).then(function(res){
+            UI.delBusy = null;
+            if (res.ok){ delete S.stops[s.id]; render(); load(true); }
+            else { UI.delMsg = {id:s.id, text:"Couldn't delete: " + (res.error || "no answer from the sheet. Check your connection and try again.")}; render(); }
+          });
         }});
         acts.appendChild(del);
       }
       row.appendChild(acts); ec.appendChild(row);
+      if (UI.delMsg && UI.delMsg.id === s.id) ec.appendChild(el("div",{cls:"msg", text:UI.delMsg.text}));
     });
     main.appendChild(ec);
     if (UI.edit && S.stops[UI.edit] && canManage(S.stops[UI.edit])) main.appendChild(createCard(S.stops[UI.edit]));
