@@ -400,6 +400,7 @@ details.how .rules li{font-size:15.5px}
   function levelLine(stop){
     if (!stop.level || !LEVELS[stop.level]) return "🎉 Season Opener  ·  counts 100%";
     var l = LEVELS[stop.level], f = FORMATS[stop.format];
+    if (stop.setup && stop.setup.tbd) return l.icon + " " + l.label + " · format confirmed once sign-ups close  ·  counts " + l.pct;
     return l.icon + " " + l.label + (f && fmtLabel(stop.level, stop.format) !== l.label ? " · " + fmtLabel(stop.level, stop.format) : "") + "  ·  counts " + l.pct;
   }
   // 1 if side A won, 0 if side B won. Full-set matches are won on sets, everything else on the score.
@@ -981,7 +982,7 @@ details.how .rules li{font-size:15.5px}
   // The sheet's Rules tab is the house rules. Each format adds its own lines on top.
   function eventRules(stop){
     var base = S.rules || DEFAULT_RULES, f = stop && stop.format;
-    if (!f || !FORMATS[f]) return base;
+    if (!f || !FORMATS[f] || (stop.setup && stop.setup.tbd)) return base;
     var out = [];
     if (f === "americano") out.push("Partners change every round, as shown in the schedule.");
     var su = stop.setup || {}, team = stop.level === "team";
@@ -1676,7 +1677,7 @@ details.how .rules li{font-size:15.5px}
   }
   function newMk(){
     return {level:"social", format:"americano", venue:"", place:"", name:"", nameEdited:false, date:today(), start:"", end:"",
-      courts:2, total:21, rounds:6, closes:"", sets:"3", diffTimes:false, courtTimes:[], players:[], pairs:null, swap:null, sched:null, newName:"", newGender:"M", similar:null, msg:""};
+      courts:2, total:21, rounds:6, closes:"", sets:"3", tbd:true, diffTimes:false, courtTimes:[], players:[], pairs:null, swap:null, sched:null, newName:"", newGender:"M", similar:null, msg:""};
   }
   function eventName(mk){
     var l = LEVELS[mk.level].label, place = (mk.place || "").trim();
@@ -1853,9 +1854,20 @@ details.how .rules li{font-size:15.5px}
     courtTimesUI(mk, card, field, changed);
 
     // 1. Level and format
-    step("Pick a level and format");
-    formatUI(mk, card, field, changed);
-    card.appendChild(el("p",{cls:"note", text:fitNote(mk)}));
+    step("Pick a level");
+    var lseg = el("div",{cls:"seg", role:"group", "aria-label":"Level"});
+    ["social","team","match"].concat(isAdmin() ? ["major"] : []).forEach(function(k){
+      lseg.appendChild(el("button",{text:LEVELS[k].label + " " + LEVELS[k].pct, "aria-pressed": mk.level === k ? "true" : "false", onclick:function(){ mk.level = k; if (LEVEL_FORMATS[k].indexOf(mk.format) < 0) mk.format = LEVEL_FORMATS[k][0]; mk.pairs = null; changed(); commit(); }}));
+    });
+    card.appendChild(lseg);
+    card.appendChild(el("p",{cls:"note", text:LEVELS[mk.level].blurb}));
+    step("Format");
+    var tseg = el("div",{cls:"seg", role:"group", "aria-label":"When to pick the format"});
+    [[true,"Decide after sign-ups"],[false,"Choose now"]].forEach(function(o){ tseg.appendChild(el("button",{text:o[1], "aria-pressed": !!mk.tbd === o[0] ? "true" : "false", onclick:function(){ mk.tbd = o[0]; changed(); commit(); }})); });
+    card.appendChild(tseg);
+    if (mk.tbd) card.appendChild(el("p",{cls:"note", text:"Recommended. Once you know who's playing, open Players and the website suggests the best format for that group. The announcement says the format is confirmed once sign-ups close."}));
+    else formatUI(mk, card, field, changed);
+    if (!mk.tbd) card.appendChild(el("p",{cls:"note", text:fitNote(mk)}));
     card.appendChild(el("p",{cls:"note", text:"Create the event now and share it in the group. Once sign-ups close, open it from Your events and add the players."}));
     var go = el("button",{cls:"btn primary wide", text:"Create event", onclick:function(){
       var name = (mk.nameEdited ? mk.name : eventName(mk)).trim();
@@ -1864,7 +1876,7 @@ details.how .rules li{font-size:15.5px}
       var span = timeSpan(mk), time = span[0] ? addMins(span[0], 0) + (span[1] ? " – " + addMins(span[1], 0) : "") : "";
       go.disabled = true; go.textContent = "Creating…";
       hostPost({action:"createEvent", level:mk.level, format:mk.format, name:name, venue:mk.venue, date:mk.date, time:time, closes:mk.closes || "",
-        total: FORMATS[mk.format].points ? mk.total : "", courts:mk.courts, setup:eventSetup(mk, {}), players:[], matches:[]}).then(function(res){
+        total: !mk.tbd && FORMATS[mk.format].points ? mk.total : "", courts:mk.courts, setup:eventSetup(mk, mk.tbd ? {tbd:true} : {}), players:[], matches:[]}).then(function(res){
         go.disabled = false; go.textContent = "Create event";
         if (res.ok){ UI.mk = null; UI.tab = "session"; UI.live = res.id; lsSet("mt-tab", UI.tab); load(); window.scrollTo(0,0); }
         else { mk.msg = res.error; render(); }
@@ -1880,7 +1892,8 @@ details.how .rules li{font-size:15.5px}
     card.appendChild(el("div",{cls:"evlevel", text:levelLine(stop) + (isGames(stop) ? (mk.rotate ? " · partners rotate" : " · same partner") : "")}));
     if (scoredMs.length) card.appendChild(el("p",{cls:"note", text:"Games already scored stay as they are. Your changes apply from round " + fromRound + "."}));
     if (!scoredMs.length){
-      step("Level and format");
+      step(stop.setup && stop.setup.tbd ? "Pick the format" : "Level and format");
+      if (stop.setup && stop.setup.tbd) card.appendChild(el("p",{cls:"note", text:"Add the players first. The Suggested box further down recommends a format for this group, and Use this fills it in here."}));
       formatUI(mk, card, field, changed);
     } else card.appendChild(el("p",{cls:"note", text:"The level, format and points are locked once a game is scored."}));
     var ct2 = el("select"); [1,2,3,4].forEach(function(n){ ct2.appendChild(el("option",{value:String(n), text:n + (n === 1 ? " court" : " courts"), selected: mk.courts === n ? "selected" : null})); });

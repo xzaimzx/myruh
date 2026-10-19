@@ -303,15 +303,16 @@ function setupText(setup, players) {
   });
   var hm = /^\d{1,2}:\d{2}$/, times = (setup.courtTimes || []).slice(0, 8).filter(function (t) { return t && hm.test(t[0]) && hm.test(t[1]); }).map(function (t) { return [t[0], t[1]]; });
   var sets = setup.sets === '1' || setup.sets === '3' ? setup.sets : '';
-  if (!setup.split && !setup.mixed && !setup.rotate && !fixed.length && !times.length && !sets) return '';
+  if (!setup.split && !setup.mixed && !setup.rotate && !fixed.length && !times.length && !sets && !setup.tbd) return '';
   var o = { split: !!setup.split, mixed: !setup.split && !!setup.mixed, rotate: !!setup.rotate, fixed: fixed };
   if (times.length) o.courtTimes = times;
   if (sets) o.sets = sets;
+  if (setup.tbd) o.tbd = true;   // format to be picked once sign-ups close
   return JSON.stringify(o);
 }
 
 function parseSetup(text) {
-  try { var o = JSON.parse(text); return { split: !!o.split, mixed: !!o.mixed, rotate: !!o.rotate, fixed: o.fixed || [], courtTimes: o.courtTimes || null, sets: o.sets || '' }; } catch (e) { return { split: false, fixed: [] }; }
+  try { var o = JSON.parse(text); return { split: !!o.split, mixed: !!o.mixed, rotate: !!o.rotate, fixed: o.fixed || [], courtTimes: o.courtTimes || null, sets: o.sets || '', tbd: !!o.tbd }; } catch (e) { return { split: false, fixed: [] }; }
 }
 
 // One row per visit: a random id for the browser (not a person), and the rough city from the visitor's connection. No IP addresses are stored.
