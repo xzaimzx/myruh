@@ -443,9 +443,12 @@ details.how .rules li{font-size:15.5px}
       });
   }
   function post(body){
-    return fetch(API_URL.trim(), {method:"POST", body: JSON.stringify(body)})
+    var req = fetch(API_URL.trim(), {method:"POST", body: JSON.stringify(body)})
       .then(function(r){ return r.json(); })
       .catch(function(){ return {ok:false, error:"Couldn't reach the Google Sheet. Check your connection and try again."}; });
+    // Never leave a button stuck: give up waiting after 45 seconds.
+    var wait = new Promise(function(done){ setTimeout(function(){ done({ok:false, error:"The Google Sheet didn't answer in time. Refresh the page to see if it worked."}); }, 45000); });
+    return Promise.race([req, wait]);
   }
   function adminPost(body){
     body.adminPin = adminPin;
