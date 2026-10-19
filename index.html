@@ -922,11 +922,19 @@ details.how .rules li{font-size:15.5px}
     if (f === "team") out.push((team ? "" : "Keep the same partner all event. ") + "Every pair plays every other pair.");
     if (f === "short") out = out.concat((rot ? [] : ["Keep the same partner all event."]).concat(["Play exactly 6 games, so scores can be 6–0, 5–1, 4–2 or 3–3.", "Golden point at deuce: the receiving pair picks the side.", "At 3–3, play a tiebreak to 7 points and enter it as 4–3."]));
     if (f === "full") out = out.concat((rot ? [] : ["Keep the same partner all event."]).concat(["Normal padel sets, 1 set or best of 3, as the Court Captain announced.", "Enter the sets, like 6-4 or 6-4 3-6 7-5."]));
+    // Odd totals (21) always have a winner; even totals (24, 32) can end level. The last-point serving rule follows the total.
+    var tot = stop.total || 21, even = tot % 2 === 0, half = Math.floor(tot / 2);
+    var serveRule = isGames(stop) ? "On match point, men may not serve to ladies." :
+      (even ? "On the last point (when the two scores add up to " + (tot - 1) + "), men may not serve to ladies." : "At " + half + "–" + half + " (the last point), men may not serve to ladies.");
     if (FORMATS[f].points) base.forEach(function(r){
-      if (/^Every game is \d+ points/.test(r)){ if (stop.total) out.push("Every game is " + stop.total + " points in total. No draws."); }
+      if (/^Every game is \d+ points/.test(r)){ if (stop.total) out.push("Every game is " + tot + " points in total" + (even ? ", so draws (" + half + "–" + half + ") are allowed." : ". No draws.")); }
+      else if (/10[–-]10|men (may not|can't|cannot) serve/i.test(r)){ if (!su.split) out.push(serveRule); }
       else out.push(r);
     });
-    else out.push("Highest games won wins the event. Top 3 get gold, silver and bronze medals.");
+    else {
+      if (!su.split) out.push(serveRule);
+      out.push("Highest games won wins the event. Top 3 get gold, silver and bronze medals.");
+    }
     return out;
   }
   function rulesCard(stop){
