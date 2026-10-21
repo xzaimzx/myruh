@@ -1569,7 +1569,9 @@ details.how .rules li{font-size:15.5px}
     card.appendChild(seg);
     var mine = open.filter(function(m){ return m.a.concat(m.b).indexOf(sw.out) >= 0; }).sort(function(x, y){ return x.round - y.round || x.court - y.court; });
     if (!sw.all) mine = mine.slice(0, 1);
-    var pool = {}; (stop.players || []).forEach(function(id){ if (S.players[id]) pool[id] = 1; }); ms.forEach(function(m){ m.a.concat(m.b).forEach(function(id){ pool[id] = 1; }); });
+    // Players still in the event; anyone who left (unticked in Players) isn't offered as a fill-in
+    var pool = {}; (stop.players || []).forEach(function(id){ if (S.players[id]) pool[id] = 1; });
+    if (!Object.keys(pool).length) ms.forEach(function(m){ m.a.concat(m.b).forEach(function(id){ pool[id] = 1; }); });
     var cnt = {}; ms.forEach(function(m){ m.a.concat(m.b).forEach(function(id){ cnt[id] = (cnt[id] || 0) + 1; }); });
     var extra = {};   // fill-ins already picked above count as one more game, so the work is shared out
     mine.forEach(function(m){
