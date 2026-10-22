@@ -591,7 +591,44 @@ details.how .rules li{font-size:15.5px}
     }
   }
 
+  // Challenge trophies: the Men's and Ladies' champions of each Tour Stop hold the trophy until the next one, where they
+  // must bring it back and defend it. Tour Stop 1 only had the Men's trophy; the Ladies' trophy starts at Tour Stop 2.
+  var TROPHY_START = {M:{id:"du", stop:1}};
+  function tourStops(){
+    var by = {};
+    sortedStops().forEach(function(s){ var m = /^Tour Stop (\d+)/i.exec(s.name || ""); if (m) (by[m[1]] = by[m[1]] || []).push(s); });
+    return Object.keys(by).map(Number).sort(function(a, b){ return a - b; }).map(function(n){ return {n:n, stops:by[n]}; });
+  }
+  function holders(){
+    var h = {M:null, F:null};
+    Object.keys(TROPHY_START).forEach(function(k){ var t = TROPHY_START[k]; h[k] = {id:t.id, since:t.stop, defended:0}; });
+    tourStops().forEach(function(ts){
+      if (ts.n < 2) return;
+      var ms = []; ts.stops.forEach(function(s){ ms = ms.concat(stopMatches(s.id)); });
+      if (!ms.length || !ms.every(scored)) return;
+      var dt = dayTable(ts.stops);
+      ["M","F"].forEach(function(k){
+        var top = dt.rows.filter(function(r){ return r.g && (S.players[r.id].gender === "F" ? "F" : "M") === k; })[0];
+        if (!top) return;   // nobody of that group played: the holder keeps it
+        if (h[k] && h[k].id === top.id) h[k].defended++; else h[k] = {id:top.id, since:ts.n, defended:0};
+      });
+    });
+    return h;
+  }
+  function holdersCard(main){
+    var h = holders(), card = el("div",{cls:"card"},[el("h3",{text:"🏆 Challenge trophy holders"})]);
+    [["M","Men's trophy"],["F","Ladies' trophy"]].forEach(function(k){
+      var x = h[k[0]];
+      card.appendChild(el("div",{cls:"evrow"},[el("div",null,[el("b",{text:k[1]}),
+        el("div",{cls:"sub", text: x ? "Won at Tour Stop " + x.since + (x.defended ? ", defended " + x.defended + (x.defended === 1 ? " time" : " times") : "") : "Up for grabs at Tour Stop 2"})]),
+        el("b",{text: x && S.players[x.id] ? nameOf(x.id) : "–"})]));
+    });
+    card.appendChild(el("p",{cls:"note", text:"The holder brings the trophy back to the next Tour Stop to defend it. The top man and the top lady of that Tour Stop take it home."}));
+    main.appendChild(card);
+  }
+
   function renderRank(main){
+    holdersCard(main);
     var C = compute();
     var seg = el("div",{cls:"seg", role:"group", "aria-label":"Ranking"});
     [["M","Men"],["F","Women"],["D","Doubles"]].forEach(function(o){
@@ -692,6 +729,7 @@ details.how .rules li{font-size:15.5px}
     var stop = currentStop();
     if (!stop){ main.appendChild(el("div",{cls:"empty", text:"No games yet. Court Captains can set one up in the Court Captains tab."})); return; }
     if (!live.length) main.appendChild(el("p",{cls:"note", text:"Nothing coming up right now, so here are the latest results. New events appear here as soon as a Court Captain creates them."}));
+    if (/^Tour Stop/i.test(stop.name || "")) holdersCard(main);
     renderStopBody(main, stop);
   }
 
