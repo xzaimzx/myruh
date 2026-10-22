@@ -1138,11 +1138,13 @@ details.how .rules li{font-size:15.5px}
 
   // The sheet's Rules tab is the house rules. Each format adds its own lines on top.
   // Everyone serves the same number of points: the total split 4 ways. At most 4 serves in a row, except 21 points
-  // (5 in a row, then one deciding point). 24 points: 3 at a time, twice round. 32 points: 4 at a time, twice round.
+  // (5 in a row, then one deciding point). 24 points: 4 each, then 2 each. 32 points: 4 at a time, twice round.
   function serveTurns(tot){
     var each = Math.floor(tot / 4), extra = tot - each * 4;
     if (extra) return "Each player serves " + each + " points in a row, then the serve passes on, so everyone serves " + each + " times. If it reaches " + Math.floor(tot / 2) + "–" + Math.floor(tot / 2) + ", the next player in turn serves the last point.";
-    var turns = Math.ceil(each / 4), run = each / turns;
+    var turns = Math.ceil(each / 4), last = each - 4 * (turns - 1);
+    if (turns > 1 && last < 4) return "Each player serves 4 points in a row, then the serve passes on. " + (turns === 2 ? "After everyone has served 4, it goes round once more with " : "After " + (turns - 1) + " times round, it goes round once more with ") + last + " each, so everyone serves " + each + " times.";
+    var run = each / turns;
     return "Each player serves " + run + " points in a row, then the serve passes on" + (turns > 1 ? " and goes round the four players " + (turns === 2 ? "twice" : turns + " times") : "") + ", so everyone serves " + each + " times.";
   }
   function eventRules(stop){
