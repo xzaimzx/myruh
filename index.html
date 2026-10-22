@@ -1113,15 +1113,15 @@ details.how .rules li{font-size:15.5px}
     var su = stop.setup || {}, team = stop.level === "team";
     if (su.split) out.push("Men play men and ladies play ladies, on their own courts.");
     if (su.mixed) out.push("Mixed doubles: every pair is one man and one lady.");
-    if (team) out.push("Keep the same partner all event.");
+    if (team) out.push("Keep the same partner for every game in this event.");
     var rot = isGames(stop) && (su.rotate || rotates(stop));
     if (rot) out.push("Partners change every round, as shown in the schedule.");
-    if (!team && su.fixed && su.fixed.length && f !== "team" && FORMATS[f] && (!FORMATS[f].pairs || rot)) out.push("These pairs stay together all event: " + su.fixed.map(function(pr){ return nameOf(pr[0]) + " & " + nameOf(pr[1]); }).join(", ") + ". Everyone else changes partner.");
+    if (!team && su.fixed && su.fixed.length && f !== "team" && FORMATS[f] && (!FORMATS[f].pairs || rot)) out.push("In " + stop.name + ", these pairs play every game together: " + su.fixed.map(function(pr){ return nameOf(pr[0]) + " & " + nameOf(pr[1]); }).join(", ") + ". The other players change partner every round.");
     if (f === "mexicano" && su.mixed && !team) out.push("Round 1 is set by ranking. After that, men and ladies are ranked apart on the day's standings: the top man partners the 2nd lady, and the 2nd man partners the top lady.");
     else if (f === "mexicano") out.push(team ? "Round 1 is set by ranking. After that, pairs meet by the day's standings: 1st v 2nd, 3rd v 4th." : "Round 1 is set by ranking. After that, each court pairs 1st and 4th against 2nd and 3rd on the day's standings.");
-    if (f === "team") out.push((team ? "" : "Keep the same partner all event. ") + "Every pair plays every other pair.");
-    if (f === "short") out = out.concat((rot ? [] : ["Keep the same partner all event."]).concat(["Play exactly 6 games, so scores can be 6–0, 5–1, 4–2 or 3–3.", "Golden point at deuce: the receiving pair picks the side.", "At 3–3, play a tiebreak to 7 points and enter it as 4–3."]));
-    if (f === "full") out = out.concat((rot ? [] : ["Keep the same partner all event."]).concat([su.sets === "1" ? "One normal padel set: first to 6 games, 2 clear. At 6–6, play a tiebreak to 7 points." : (su.sets === "3" ? "Best of 3 normal padel sets. At 6–6 in a set, play a tiebreak to 7 points." : "Normal padel sets, 1 set or best of 3, as the Court Captain announced."), "Enter the sets, like 6-4 or 6-4 3-6 7-5."]));
+    if (f === "team") out.push((team ? "" : "Keep the same partner for every game in this event. ") + "Every pair plays every other pair.");
+    if (f === "short") out = out.concat((rot ? [] : ["Keep the same partner for every game in this event."]).concat(["Play exactly 6 games, so scores can be 6–0, 5–1, 4–2 or 3–3.", "Golden point at deuce: the receiving pair picks the side.", "At 3–3, play a tiebreak to 7 points and enter it as 4–3."]));
+    if (f === "full") out = out.concat((rot ? [] : ["Keep the same partner for every game in this event."]).concat([su.sets === "1" ? "One normal padel set: first to 6 games, 2 clear. At 6–6, play a tiebreak to 7 points." : (su.sets === "3" ? "Best of 3 normal padel sets. At 6–6 in a set, play a tiebreak to 7 points." : "Normal padel sets, 1 set or best of 3, as the Court Captain announced."), "Enter the sets, like 6-4 or 6-4 3-6 7-5."]));
     // Odd totals (21) always have a winner; even totals (24, 32) can end level. The last-point serving rule follows the total.
     var tot = stop.total || 21, even = tot % 2 === 0, half = Math.floor(tot / 2);
     var serveRule = isGames(stop) ? "On match point, men may not serve to ladies." :
