@@ -1002,22 +1002,27 @@ details.how .rules li{font-size:15.5px}
     return g.length > 1 ? g : null;
   }
   // Points and games are on different scales (24-point Americano, 6-game matches), and some players play more games,
-  // so each player is ranked by their average share of each game won (14–10 is 58%), then by share of games won.
+  // so every game is counted as Day points out of one total (the day's points events, else 24): a 14–10 game gives 14,
+  // a 4–2 short match gives 16 of 24. Players are ranked by average Day points per game, then by share of games won.
+  function dayBase(group){
+    var b = 0; group.forEach(function(s){ if (!isGames(s) && s.total > b) b = s.total; });
+    return b || 24;
+  }
   function dayTable(group){
-    var t = {}, all = [];
+    var t = {}, all = [], base = dayBase(group);
     group.forEach(function(s){ stopMatches(s.id).forEach(function(m){ all.push(m); }); });
-    all.forEach(function(m){ m.a.concat(m.b).forEach(function(id){ if (isSub(m, id) || !S.players[id]) return; var x = t[id] = t[id] || {id:id, g:0, w:0, d:0, sh:0, in:{}}; x.in[m.stop] = 1; }); });
+    all.forEach(function(m){ m.a.concat(m.b).forEach(function(id){ if (isSub(m, id) || !S.players[id]) return; var x = t[id] = t[id] || {id:id, g:0, w:0, d:0, sh:0, pt:0, in:{}}; x.in[m.stop] = 1; }); });
     all.forEach(function(m){ if (!scored(m)) return;
       var wn = winOf(m), tot = m.sa + m.sb;
       [[m.a, m.sa, 1], [m.b, m.sb, 0]].forEach(function(sd){ sd[0].forEach(function(id){ var x = t[id]; if (!x || isSub(m, id)) return;
-        x.g++; x.sh += sd[1] / tot; if (wn === sd[2]) x.w++; else if (wn === 0.5) x.d++; }); });
+        x.g++; x.sh += sd[1] / tot; x.pt += sd[1] / tot * base; if (wn === sd[2]) x.w++; else if (wn === 0.5) x.d++; }); });
     });
     var rows = Object.keys(t).map(function(k){ return t[k]; });
     function av(x){ return x.g ? x.sh / x.g : -1; }
     rows.sort(function(a, b){ return av(b) - av(a) || (b.g ? (b.w + b.d / 2) / b.g : 0) - (a.g ? (a.w + a.d / 2) / a.g : 0) || nameOf(a.id).localeCompare(nameOf(b.id)); });
     var ms = all.length, done = all.filter(scored).length;
     rows.forEach(function(r){ r.every = group.every(function(s){ return r.in[s.id]; }); });
-    return {rows:rows, done:done, total:ms};
+    return {rows:rows, done:done, total:ms, base:base};
   }
   // Men's and Ladies' champions win the challenge trophies; the All Events Champion gets a sponsor's prize.
   var DAY_KINDS = [["M","Men"],["F","Ladies"],["all","All events"]];
@@ -1035,19 +1040,28 @@ details.how .rules li{font-size:15.5px}
     kinds.forEach(function(k){ seg.appendChild(el("button",{text:k[1], "aria-pressed": UI.dayKind === k[0] ? "true" : "false", onclick:function(){ UI.dayKind = k[0]; render(); }})); });
     card.appendChild(seg);
     var rows = dayRows(dt, UI.dayKind);
-    card.appendChild(el("p",{cls:"note", text:(UI.dayKind === "all" ? "Only players who played in every linked event can be All Events Champion of the Day, which wins a sponsor's prize. " : "The " + (UI.dayKind === "F" ? "Ladies'" : "Men's") + " Champion wins the challenge trophy. ") + "How it works: every game gives you a score out of 100%. Win 14–10 and you get 58%; lose 10–14 and you get 42%. Your result is the average of all your games, so playing more games doesn't help or hurt. If two players are level, the one who won more games is ahead. " + (dt.done ? (final ? "Final standings." : dt.done + " of " + dt.total + " games scored. Champions are confirmed once every game is in.") : "Standings appear as soon as the first score is in.")}));
+    card.appendChild(el("p",{cls:"note", text:(UI.dayKind === "all" ? "Only players who played in every linked event can be All Events Champion of the Day, which wins a sponsor's prize. " : "The " + (UI.dayKind === "F" ? "Ladies'" : "Men's") + " Champion wins the challenge trophy. ") + dayHow(group, dt.base) + (dt.done ? (final ? "Final standings." : dt.done + " of " + dt.total + " games scored. Champions are confirmed once every game is in.") : "Standings appear as soon as the first score is in.")}));
     var tb = el("tbody"), shown = dt.done > 0;
     if (!rows.length) card.appendChild(el("p",{cls:"note", text: UI.dayKind === "all" ? "Nobody is playing in every linked event." : "No players here."}));
     rows.forEach(function(r, i){
       tb.appendChild(el("tr",{cls: shown && !i ? "podium" : null},[
         el("td",{cls:"rk", text: shown && !i ? dayIcon(UI.dayKind) : String(i + 1)}),
         el("td",null,[el("b",{text:nameOf(r.id)}), el("div",{cls:"sub", text: r.g ? r.w + "W" + (r.d ? " " + r.d + "D" : "") + " from " + r.g + (r.g === 1 ? " game" : " games") : "No games yet"})]),
-        el("td",{cls:"pts", text: r.g ? Math.round(r.sh / r.g * 100) + "%" : "–"})
+        el("td",{cls:"pts", text: r.g ? dayAvg(r) : "–"})
       ]));
     });
-    card.appendChild(el("table",{cls:"standings lbt"},[el("thead",null,[el("tr",null,[el("th",{text:"#"}), el("th",{text:"Player"}), el("th",{text:"Avg"})])]), tb]));
+    card.appendChild(el("table",{cls:"standings lbt"},[el("thead",null,[el("tr",null,[el("th",{text:"#"}), el("th",{text:"Player"}), el("th",{text:"Pts/game"})])]), tb]));
     if (dt.done) card.appendChild(el("button",{cls:"btn ghost wide", text:"Share day champions", style:"margin-top:12px", onclick:function(){ openShare(dayText(group, dt)); }}));
     return card;
+  }
+  function dayAvg(r){ return String(Math.round(r.pt / r.g * 10) / 10); }
+  function dayHow(group, base){
+    var pts = group.filter(function(s){ return !isGames(s); }), gms = group.filter(isGames), h = Math.floor(base / 2);
+    function names(l){ return l.map(function(s){ return s.name.replace(/^Tour Stop \d+\s*·\s*/i, ""); }).join(" and "); }
+    var t = "How it works: every game gives you Day points. ";
+    if (pts.length) t += "In " + names(pts) + ", your points count as they are" + (pts.some(function(s){ return s.total !== base; }) ? ", counted out of " + base : "") + " (win " + (h + 2) + "–" + (base - h - 2) + " and you get " + (h + 2) + "). ";
+    if (gms.length) t += names(gms) + " is scored in games, so each game is turned into points out of " + base + ": win 4–2 and you get " + Math.round(4 / 6 * base) + ". ";
+    return t + "Your Day points are the average per game, so playing more games doesn't help or hurt. If two players are level, the one who won more games is ahead. ";
   }
   function dayText(group, dt){
     var out = ["🏆 *DAY CHAMPIONS* 🏆", group.map(function(s){ return s.name; }).join(" + ") + " · " + fmtDate(group[0].date), ""];
@@ -1056,7 +1070,7 @@ details.how .rules li{font-size:15.5px}
       var r = dayRows(dt, k[0]).filter(function(x){ return x.g; })[0];
       if (!r) return;
       out.push("*" + titles[k[0]] + "*");
-      out.push(dayIcon(k[0]) + " " + nameOf(r.id) + " – " + Math.round(r.sh / r.g * 100) + "% (" + r.w + "W/" + (r.d ? r.d + "D/" : "") + r.g + "P)");
+      out.push(dayIcon(k[0]) + " " + nameOf(r.id) + " – " + dayAvg(r) + " pts per game (" + r.w + "W/" + (r.d ? r.d + "D/" : "") + r.g + "P)");
       out.push("");
     });
     if (dt.done < dt.total) out.push("_" + dt.done + " of " + dt.total + " games scored so far._");
