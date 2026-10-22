@@ -1072,11 +1072,12 @@ details.how .rules li{font-size:15.5px}
     if (FORMATS[f].points) base.forEach(function(r){
       if (/^Every game is \d+ points/.test(r)){ if (stop.total) out.push("Every game is " + tot + " points in total" + (even ? ", so draws (" + half + "–" + half + ") are allowed." : ". No draws.")); }
       else if (/10[–-]10|men (may not|can't|cannot) serve/i.test(r)){ if (!su.split) out.push(serveRule); }
+      else if (/^Highest points wins/i.test(r)) out.push(su.split ? "Highest points wins, one winner among the men and one among the ladies." : "Highest points wins the event.");
       else out.push(r);
     });
     else {
       if (!su.split) out.push(serveRule);
-      out.push("Highest games won wins the event. Top 3 get gold, silver and bronze medals.");
+      out.push("Highest games won wins the event.");
     }
     return out;
   }
