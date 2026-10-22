@@ -955,11 +955,10 @@ details.how .rules li{font-size:15.5px}
     return card;
   }
 
-  // Events on the same day at the same venue are linked: one set of day champions (overall, men, ladies) across all of them.
+  // Events a captain has linked (same day): one set of Day champions across all of them.
   function dayGroup(stop){
-    if (!stop.date || !stop.venue) return null;
-    var v = stop.venue.trim().toLowerCase();
-    var g = sortedStops().filter(function(s){ return s.date === stop.date && (s.venue || "").trim().toLowerCase() === v && stopMatches(s.id).length; });
+    if (!stop.link) return null;
+    var g = sortedStops().filter(function(s){ return s.link === stop.link; });
     return g.length > 1 ? g : null;
   }
   // Points and games are on different scales (24-point Americano, 6-game matches), and some players play more games,
@@ -967,7 +966,7 @@ details.how .rules li{font-size:15.5px}
   function dayTable(group){
     var t = {}, all = [];
     group.forEach(function(s){ stopMatches(s.id).forEach(function(m){ all.push(m); }); });
-    all.forEach(function(m){ m.a.concat(m.b).forEach(function(id){ if (!isSub(m, id) && S.players[id]) t[id] = t[id] || {id:id, g:0, w:0, d:0, sh:0}; }); });
+    all.forEach(function(m){ m.a.concat(m.b).forEach(function(id){ if (isSub(m, id) || !S.players[id]) return; var x = t[id] = t[id] || {id:id, g:0, w:0, d:0, sh:0, in:{}}; x.in[m.stop] = 1; }); });
     all.forEach(function(m){ if (!scored(m)) return;
       var wn = winOf(m), tot = m.sa + m.sb;
       [[m.a, m.sa, 1], [m.b, m.sb, 0]].forEach(function(sd){ sd[0].forEach(function(id){ var x = t[id]; if (!x || isSub(m, id)) return;
@@ -977,20 +976,26 @@ details.how .rules li{font-size:15.5px}
     function av(x){ return x.g ? x.sh / x.g : -1; }
     rows.sort(function(a, b){ return av(b) - av(a) || (b.g ? (b.w + b.d / 2) / b.g : 0) - (a.g ? (a.w + a.d / 2) / a.g : 0) || nameOf(a.id).localeCompare(nameOf(b.id)); });
     var ms = all.length, done = all.filter(scored).length;
+    rows.forEach(function(r){ r.every = group.every(function(s){ return r.in[s.id]; }); });
     return {rows:rows, done:done, total:ms};
+  }
+  var DAY_KINDS = [["all","All events"],["M","Men"],["F","Ladies"]];
+  function dayRows(dt, kind){
+    return dt.rows.filter(function(r){ return kind === "all" ? r.every : (S.players[r.id].gender === "F" ? "F" : "M") === kind; });
   }
   function dayCard(group){
     var dt = dayTable(group), final = dt.done === dt.total;
-    var kinds = [["all","Overall"],["M","Men"],["F","Ladies"]];
+    var kinds = DAY_KINDS;
     if (!kinds.some(function(k){ return k[0] === UI.dayKind; })) UI.dayKind = "all";
     var card = el("div",{cls:"card lb"},[el("h3",{text:"🏆 Day champions"})]);
     card.appendChild(el("p",{cls:"note", text:"Linked events: " + group.map(function(s){ return s.name; }).join(" + ") + ". Every game from these events counts."}));
     var seg = el("div",{cls:"seg", role:"group", "aria-label":"Champions"});
     kinds.forEach(function(k){ seg.appendChild(el("button",{text:k[1], "aria-pressed": UI.dayKind === k[0] ? "true" : "false", onclick:function(){ UI.dayKind = k[0]; render(); }})); });
     card.appendChild(seg);
-    var rows = dt.rows.filter(function(r){ return UI.dayKind === "all" || (S.players[r.id].gender === "F" ? "F" : "M") === UI.dayKind; });
-    card.appendChild(el("p",{cls:"note", text:"Ranked by average share of each game won (14–10 is 58%), so points and match scores count the same and playing more games is no advantage. Ties go to whoever won more of their games. " + (dt.done ? (final ? "Final standings." : dt.done + " of " + dt.total + " games scored. Champions are confirmed once every game is in.") : "Standings appear as soon as the first score is in.")}));
+    var rows = dayRows(dt, UI.dayKind);
+    card.appendChild(el("p",{cls:"note", text:(UI.dayKind === "all" ? "Only players who played in every linked event can be All Events Champion of the Day. " : "") + "Ranked by average share of each game won (14–10 is 58%), so points and match scores count the same and playing more games is no advantage. Ties go to whoever won more of their games. " + (dt.done ? (final ? "Final standings." : dt.done + " of " + dt.total + " games scored. Champions are confirmed once every game is in.") : "Standings appear as soon as the first score is in.")}));
     var md = ["🥇","🥈","🥉"], tb = el("tbody"), shown = dt.done > 0;
+    if (!rows.length) card.appendChild(el("p",{cls:"note", text: UI.dayKind === "all" ? "Nobody is playing in every linked event." : "No players here."}));
     rows.forEach(function(r, i){
       tb.appendChild(el("tr",{cls: shown && i < 3 ? "podium" : null},[
         el("td",{cls:"rk", text: shown && i < 3 ? md[i] : String(i + 1)}),
@@ -1004,10 +1009,10 @@ details.how .rules li{font-size:15.5px}
   }
   function dayText(group, dt){
     var out = ["🏆 *DAY CHAMPIONS* 🏆", group.map(function(s){ return s.name; }).join(" + ") + " · " + fmtDate(group[0].date), ""], md = ["🥇","🥈","🥉"];
-    [["all","Overall"],["M","Men"],["F","Ladies"]].forEach(function(k){
-      var rows = dt.rows.filter(function(r){ return r.g && (k[0] === "all" || (S.players[r.id].gender === "F" ? "F" : "M") === k[0]); }).slice(0, 3);
+    DAY_KINDS.forEach(function(k){
+      var rows = dayRows(dt, k[0]).filter(function(r){ return r.g; }).slice(0, 3);
       if (!rows.length) return;
-      out.push("*" + k[1] + "*");
+      out.push("*" + (k[0] === "all" ? "All Events Champion of the Day" : k[1]) + "*");
       rows.forEach(function(r, i){ out.push(md[i] + " " + nameOf(r.id) + " – " + Math.round(r.sh / r.g * 100) + "% (" + r.w + "W/" + (r.d ? r.d + "D/" : "") + r.g + "P)"); });
       out.push("");
     });
@@ -1779,6 +1784,47 @@ details.how .rules li{font-size:15.5px}
     det.addEventListener("toggle", function(){ UI.rtOpen = det.open; });
     return det;
   }
+  // Link events on the same day for Day champions (overall across all events, men, ladies).
+  function linkCard(mine){
+    var days = {};
+    mine.forEach(function(s){ if (s.date && s.level) (days[s.date] = days[s.date] || []).push(s); });
+    var dates = Object.keys(days).filter(function(d){ return days[d].length > 1; }).sort().reverse();
+    if (!dates.length) return null;
+    var card = el("div",{cls:"card"},[el("h3",{text:"🏆 Link events for Day champions"}),
+      el("p",{cls:"note", text:"Running more than one event on the same day? Link them to crown an All Events Champion of the Day (only players who played every linked event), plus a men's and a ladies' champion."})]);
+    UI.linkPick = UI.linkPick || {};
+    dates.forEach(function(d){
+      var evs = days[d].slice().reverse();
+      card.appendChild(el("div",{cls:"step", text:fmtDate(d)}));
+      var linked = {}; evs.forEach(function(s){ if (s.link) (linked[s.link] = linked[s.link] || []).push(s); });
+      Object.keys(linked).forEach(function(k){
+        var g = sortedStops().filter(function(s){ return s.link === k; });
+        if (g.length < 2) return;
+        card.appendChild(el("div",{cls:"evrow"},[el("div",null,[el("b",{text:"Linked"}), el("div",{cls:"sub", text:g.map(function(s){ return s.name; }).join(" + ")})]),
+          el("div",{cls:"evacts"},[el("button",{cls:"linkbtn", text: UI.linkBusy === k ? "Unlinking…" : "Unlink", onclick:function(){ linkPost({action:"linkEvents", unlink:true, stops:[g[0].id]}, k); }})])]));
+      });
+      var free = evs.filter(function(s){ return !s.link || sortedStops().filter(function(x){ return x.link === s.link; }).length < 2; });
+      if (free.length < 2) return;
+      var pick = UI.linkPick[d] || (UI.linkPick[d] = free.map(function(s){ return s.id; }));
+      var chips = el("div",{cls:"pick"});
+      free.forEach(function(s){ chips.appendChild(el("button",{cls:"pchip", "aria-pressed": pick.indexOf(s.id) >= 0 ? "true" : "false", text:s.name, onclick:function(){ var i = pick.indexOf(s.id); if (i >= 0) pick.splice(i, 1); else pick.push(s.id); render(); }})); });
+      card.appendChild(chips);
+      card.appendChild(el("button",{cls:"btn ghost wide", text: UI.linkBusy === d ? "Linking…" : "Link " + (pick.length > 1 ? pick.length + " events" : "events"), disabled: pick.length < 2 || UI.linkBusy ? "disabled" : null, onclick:function(){ linkPost({action:"linkEvents", stops:pick.slice()}, d); }}));
+    });
+    if (UI.linkMsg) card.appendChild(el("div",{cls:"msg", text:UI.linkMsg}));
+    return card;
+  }
+  function linkPost(body, key){
+    UI.linkBusy = key; UI.linkMsg = ""; render();
+    hostPost(body).then(function(res){
+      UI.linkBusy = null;
+      if (res.ok){ var link = body.unlink ? "" : body.stops[0];
+        sortedStops().forEach(function(s){ if (body.unlink ? s.link === key : body.stops.indexOf(s.id) >= 0) s.link = link; });
+        UI.linkPick = {}; load(true); }
+      else UI.linkMsg = res.error || "Couldn't reach the Google Sheet. Try again.";
+      render();
+    });
+  }
   function renderCaptains(main){
     var intro = el("div",{cls:"card"},[el("h3",{text:"Court Captains"}),
       el("p",{cls:"note", text:"Captains book the court, pick a level, choose the players, and the website makes the schedule. Every ranked event needs at least 6 players. Ladies-only events are welcome and fully ranked."})]);
@@ -1842,6 +1888,7 @@ details.how .rules li{font-size:15.5px}
       if (UI.delMsg && UI.delMsg.id === s.id) ec.appendChild(el("div",{cls:"msg", text:UI.delMsg.text}));
     });
     main.appendChild(ec);
+    var lc = linkCard(mine); if (lc) main.appendChild(lc);
     if (UI.edit && S.stops[UI.edit] && canManage(S.stops[UI.edit])) main.appendChild(createCard(S.stops[UI.edit]));
     main.appendChild(createCard());
   }

@@ -16,7 +16,7 @@
 
 var TABS = {
   Players: ['id', 'name', 'gender', 'joined'],
-  Stops: ['id', 'name', 'date', 'venue', 'total', 'created', 'time', 'level', 'format', 'host', 'courts', 'rounds', 'players', 'setup', 'closes'],
+  Stops: ['id', 'name', 'date', 'venue', 'total', 'created', 'time', 'level', 'format', 'host', 'courts', 'rounds', 'players', 'setup', 'closes', 'link'],
   Matches: ['id', 'stop', 'cup', 'round', 'time', 'court', 'a1', 'a2', 'b1', 'b2', 'sa', 'sb', 'seq', 'enteredBy', 'updated', 'sets', 'subs'],
   ScoreLog: ['time', 'name', 'matchId', 'match', 'oldScore', 'newScore'],
   Settings: ['key', 'value', 'note'],
@@ -179,6 +179,7 @@ function handle(req) {
     case 'swapPlayer': return swapPlayer(req);
     case 'visit': return addVisit(req);
     case 'deleteEvent': return deleteEvent(req);
+    case 'linkEvents': return linkEvents(req);
     case 'addStop': return admin(req) || addStop(req);
     case 'addMatch': return admin(req) || addMatch(req);
     case 'deleteMatch': return admin(req) || deleteMatch(req);
@@ -451,6 +452,28 @@ function addRound(req) {
   return { ok: true };
 }
 
+// Links events on the same day so they share Day champions. Unlinking clears the whole group.
+function linkEvents(req) {
+  var c = host(req);
+  if (c.error) return c.error;
+  ensureHeader('Stops');
+  var all = rows('Stops'), ids = (req.stops || []).map(String);
+  if (req.unlink) {
+    var one = all.filter(function (s) { return s.id === ids[0]; })[0];
+    if (!one || !one.link) return { ok: true };
+    ids = all.filter(function (s) { return s.link === one.link; }).map(function (s) { return s.id; });
+  }
+  var picked = all.filter(function (s) { return ids.indexOf(s.id) >= 0; });
+  if (!req.unlink && picked.length < 2) return { ok: false, error: 'Pick at least 2 events to link.' };
+  if (picked.some(function (s) { return s.date !== picked[0].date; })) return { ok: false, error: 'Only events on the same day can be linked.' };
+  var notMine = picked.filter(function (s) { return !ownsStop(c, s); })[0];
+  if (notMine) return { ok: false, error: 'Only ' + notMine.host + ' or the organiser can link ' + notMine.name + '.' };
+  var sh = sheet('Stops'), col = TABS.Stops.indexOf('link') + 1, link = req.unlink ? '' : picked[0].id;
+  picked.forEach(function (s) { sh.getRange(findRow(sh, s.id), col).setValue(link); });
+  sheet('ScoreLog').appendRow([new Date().toISOString(), c.name, picked[0].id, (req.unlink ? 'Unlinked ' : 'Linked ') + picked.map(function (s) { return s.name; }).join(' + '), '–', 'link']);
+  return { ok: true };
+}
+
 function deleteEvent(req) {
   var c = host(req);
   if (c.error) return c.error;
@@ -538,7 +561,7 @@ function readAll() {
   var stops = rows('Stops').map(function (s) {
     return {
       id: s.id, name: s.name, date: s.date, venue: s.venue, total: num(s.total), created: s.created, time: s.time,
-      level: s.level, format: s.format, host: s.host, courts: num(s.courts), rounds: num(s.rounds), players: s.players ? s.players.split(',') : [], setup: parseSetup(s.setup), closes: s.closes || ''
+      level: s.level, format: s.format, host: s.host, courts: num(s.courts), rounds: num(s.rounds), players: s.players ? s.players.split(',') : [], setup: parseSetup(s.setup), closes: s.closes || '', link: s.link || ''
     };
   });
   var matches = rows('Matches').map(function (m) {
