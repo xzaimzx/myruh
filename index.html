@@ -1018,7 +1018,8 @@ details.how .rules li{font-size:15.5px}
         x.g++; x.sh += sd[1] / tot; x.pt += sd[1] / tot * base; if (wn === sd[2]) x.w++; else if (wn === 0.5) x.d++; }); });
     });
     var rows = Object.keys(t).map(function(k){ return t[k]; });
-    function av(x){ return x.g ? x.sh / x.g : -1; }
+    // Ranked on the shown (rounded) Day points, so two players who look level are split by games won.
+    function av(x){ return x.g ? Math.round(x.pt / x.g * 10) / 10 : -1; }
     rows.sort(function(a, b){ return av(b) - av(a) || (b.g ? (b.w + b.d / 2) / b.g : 0) - (a.g ? (a.w + a.d / 2) / a.g : 0) || nameOf(a.id).localeCompare(nameOf(b.id)); });
     var ms = all.length, done = all.filter(scored).length;
     rows.forEach(function(r){ r.every = group.every(function(s){ return r.in[s.id]; }); });
