@@ -164,6 +164,9 @@ nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);bord
 details.how summary{cursor:pointer;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:21px;list-style-position:inside}
 details.how p{margin:10px 0 0;font-size:15px}
 details.how .rules li{font-size:15.5px}
+details.rk-how{margin-top:12px}
+details.rk-how summary{cursor:pointer;font-weight:700;font-size:15px}
+details.rk-how p{margin:8px 0 0}
 .event .evmeta{font-family:"Barlow",sans-serif;font-size:13.5px;font-weight:500;opacity:.8;margin-top:6px}
 .lineup{padding:6px 0;font-size:15px}.lineup + .lineup{border-top:1px solid var(--line)}
 .lineup b{font-family:"Barlow Condensed",sans-serif;font-size:17px}
@@ -977,7 +980,8 @@ details.how .rules li{font-size:15.5px}
     var list = byCup[UI.cup], done = list.filter(scored).length, final = done === list.length;
     var rows = cupTable(list, stop), avg = rows.avg;
     var unit = isGames(stop) ? "games" : "points";
-    card.appendChild(el("p",{cls:"note", text:(avg ? "Players had different numbers of games, so the ranking is by average " + unit + " per game, then by share of matches won. " : "Ranked by total " + unit + " won, then by matches won to break a tie. ") + (done ? (final ? "Final standings." : done + " of " + list.length + " games scored. " + (stop.level ? "The winner is" : "Medals are") + " confirmed once every game is in.") : "Standings appear as soon as the first score is in.")}));
+    var how = avg ? "Players had different numbers of games, so the ranking is by average " + unit + " per game, then by share of matches won." : "Ranked by total " + unit + " won, then by matches won to break a tie.";
+    card.appendChild(el("p",{cls:"note", text:(done ? (final ? "Final standings." : done + " of " + list.length + " games scored. " + (stop.level ? "The winner is" : "Medals are") + " confirmed once every game is in.") : "Standings appear as soon as the first score is in.")}));
     // Events made by Court Captains crown one winner; Tour Stop 1 handed out medals to the top 3.
     var md = podium(stop);
     var tb = el("tbody");
@@ -991,6 +995,7 @@ details.how .rules li{font-size:15.5px}
     });
     var tbl = el("table",{cls:"standings lbt"},[el("thead",null,[el("tr",null,[el("th",{text:"#"}), el("th",{text:"Player"}), el("th",{text: avg ? "Avg" : (isGames(stop) ? "Games" : "Pts")})])]), tb]);
     card.appendChild(tbl);
+    card.appendChild(rankHow("lb", how));
     if (done) card.appendChild(el("button",{cls:"btn ghost wide", text:"Share leaderboard", style:"margin-top:12px", onclick:function(){ openShare(stopText(stop, cups, byCup)); }}));
     return card;
   }
@@ -1041,7 +1046,7 @@ details.how .rules li{font-size:15.5px}
     kinds.forEach(function(k){ seg.appendChild(el("button",{text:k[1], "aria-pressed": UI.dayKind === k[0] ? "true" : "false", onclick:function(){ UI.dayKind = k[0]; render(); }})); });
     card.appendChild(seg);
     var rows = dayRows(dt, UI.dayKind);
-    card.appendChild(el("p",{cls:"note", text:(UI.dayKind === "all" ? "Only players who played in every linked event can be All Events Champion of the Day, which wins a sponsor's prize. " : "The " + (UI.dayKind === "F" ? "Ladies'" : "Men's") + " Champion wins the challenge trophy. ") + dayHow(group, dt.base) + (dt.done ? (final ? "Final standings." : dt.done + " of " + dt.total + " games scored. Champions are confirmed once every game is in.") : "Standings appear as soon as the first score is in.")}));
+    card.appendChild(el("p",{cls:"note", text:(UI.dayKind === "all" ? "Only players who played in every linked event can be All Events Champion of the Day, which wins a sponsor's prize. " : "The " + (UI.dayKind === "F" ? "Ladies'" : "Men's") + " Champion wins the challenge trophy. ") + (dt.done ? (final ? "Final standings." : dt.done + " of " + dt.total + " games scored. Champions are confirmed once every game is in.") : "Standings appear as soon as the first score is in.")}));
     var tb = el("tbody"), shown = dt.done > 0;
     if (!rows.length) card.appendChild(el("p",{cls:"note", text: UI.dayKind === "all" ? "Nobody is playing in every linked event." : "No players here."}));
     rows.forEach(function(r, i){
@@ -1052,14 +1057,22 @@ details.how .rules li{font-size:15.5px}
       ]));
     });
     card.appendChild(el("table",{cls:"standings lbt"},[el("thead",null,[el("tr",null,[el("th",{text:"#"}), el("th",{text:"Player"}), el("th",{text:"Pts/game"})])]), tb]));
+    card.appendChild(rankHow("day", dayHow(group, dt.base)));
     if (dt.done) card.appendChild(el("button",{cls:"btn ghost wide", text:"Share day champions", style:"margin-top:12px", onclick:function(){ openShare(dayText(group, dt)); }}));
     return card;
+  }
+  // "How the ranking works", closed until tapped, under a ranking table. Stays open across the 20-second refreshes.
+  function rankHow(key, text){
+    UI.howOpen = UI.howOpen || {};
+    var det = el("details",{cls:"rk-how", open: UI.howOpen[key] ? "open" : null},[el("summary",{text:"How the ranking works"}), el("p",{cls:"note", text:text})]);
+    det.addEventListener("toggle", function(){ UI.howOpen[key] = det.open; });
+    return det;
   }
   function dayAvg(r){ return String(Math.round(r.pt / r.g * 10) / 10); }
   function dayHow(group, base){
     var pts = group.filter(function(s){ return !isGames(s); }), gms = group.filter(isGames), h = Math.floor(base / 2);
     function names(l){ return l.map(function(s){ return s.name.replace(/^Tour Stop \d+\s*·\s*/i, ""); }).join(" and "); }
-    var t = "How it works: every game gives you Day points. ";
+    var t = "Every game gives you Day points. ";
     if (pts.length) t += "In " + names(pts) + ", your points count as they are" + (pts.some(function(s){ return s.total !== base; }) ? ", counted out of " + base : "") + " (win " + (h + 2) + "–" + (base - h - 2) + " and you get " + (h + 2) + "). ";
     if (gms.length) t += names(gms) + " is scored in games, so each game is turned into points out of " + base + ": win 4–2 and you get " + Math.round(4 / 6 * base) + ". ";
     return t + "Your Day points are the average per game, so playing more games doesn't help or hurt. If two players are level, the one who won more games is ahead. ";
