@@ -916,6 +916,7 @@ details.how .rules li{font-size:15.5px}
       });
     });
     if (stop.format === "mexicano" && ms.length && canManage(stop)) main.appendChild(nextRoundCard(stop, ms));
+    if (stop.level && stop.format !== "mexicano" && ms.length && canManage(stop) && !isDone(stop)) extraRoundCard(main, stop, ms);
     if (ms.length && canManage(stop) && ms.some(function(m){ return !scored(m); })) main.appendChild(swapCard(stop, ms));
     if (isAdmin()) main.appendChild(addMatchForm(stop, cups, ms));
     if (ms.length){
@@ -1020,6 +1021,53 @@ details.how .rules li{font-size:15.5px}
     });
     if (dt.done < dt.total) out.push("_" + dt.done + " of " + dt.total + " games scored so far._");
     return out.join("\n").trim();
+  }
+
+  // Players who get fewer games than the rest, and an extra round that evens them up (keeping fixed pairs together).
+  // games: [{cup, a:[id,id], b:[id,id]}]. One result per cup with someone short.
+  function shortfall(games, players, fixed){
+    var byCup = {}, order = [];
+    games.forEach(function(g){ if (!byCup[g.cup]){ byCup[g.cup] = []; order.push(g.cup); } byCup[g.cup].push(g); });
+    var out = [];
+    order.forEach(function(c){
+      var cnt = {};
+      if (order.length === 1) (players || []).forEach(function(id){ if (S.players[id]) cnt[id] = 0; });
+      byCup[c].forEach(function(g){ g.a.concat(g.b).forEach(function(id){ cnt[id] = (cnt[id] || 0) + 1; }); });
+      var ids = Object.keys(cnt), max = Math.max.apply(null, ids.map(function(id){ return cnt[id]; }));
+      var short = ids.filter(function(id){ return cnt[id] < max; }).sort(function(a, b){ return nameOf(a).localeCompare(nameOf(b)); });
+      if (!short.length) return;
+      var teams = [], used = {};
+      (fixed || []).forEach(function(pr){ if (short.indexOf(pr[0]) >= 0 && short.indexOf(pr[1]) >= 0){ teams.push(pr.slice()); used[pr[0]] = used[pr[1]] = 1; } });
+      var singles = short.filter(function(id){ return !used[id]; }), left = [];
+      for (var i = 0; i + 1 < singles.length; i += 2) teams.push([singles[i], singles[i + 1]]);
+      if (singles.length % 2) left.push(singles[singles.length - 1]);
+      var gs = [];
+      for (var j = 0; j + 1 < teams.length; j += 2) gs.push({cup:c, a:teams[j], b:teams[j + 1]});
+      if (teams.length % 2) left = left.concat(teams[teams.length - 1]);
+      out.push({cup:c, short:short, fewer:max - 1, games:gs, left:left});
+    });
+    return out;
+  }
+  // "10:38am" + 17 minutes = "10:55am" (addMins on its own only reads 24-hour times)
+  function laterTime(t, mins){
+    var p = /^(\d{1,2}):(\d{2})\s*(am|pm)?/i.exec(t || ""); if (!p) return "";
+    var h = +p[1], ap = (p[3] || "").toLowerCase();
+    if (ap === "pm" && h < 12) h += 12; else if (ap === "am" && h === 12) h = 0;
+    return addMins(h + ":" + p[2], mins);
+  }
+  function shortCard(res, onAdd, busy, msg){
+    var box = el("div",{cls:"warn"});
+    res.forEach(function(r){
+      box.appendChild(el("p",null,[el("b",{text:"Fewer games" + (res.length > 1 ? " (" + r.cup + ")" : "") + ": "}), r.short.map(nameOf).join(", ") + (r.short.length === 1 ? " plays " : " play ") + r.fewer + (r.fewer === 1 ? " game" : " games") + ", one fewer than everyone else."]));
+      r.games.forEach(function(g){ box.appendChild(el("p",{cls:"note", text:"Extra game: " + g.a.map(nameOf).join(" / ") + " v " + g.b.map(nameOf).join(" / ")})); });
+      if (r.left.length) box.appendChild(el("p",{cls:"note", text:r.left.map(nameOf).join(", ") + " can't" + " be fitted into an extra game with only the short players. Try Shuffle the schedule again, or leave it."}));
+    });
+    if (res.some(function(r){ return r.games.length; })){
+      box.appendChild(el("p",{cls:"note", text:"It's your call: add an extra round if you can extend a court, or leave it as it is."}));
+      box.appendChild(el("button",{cls:"btn ghost", text: busy ? "Adding…" : "Add the extra round", disabled: busy ? "disabled" : null, onclick:onAdd}));
+    }
+    if (msg) box.appendChild(el("div",{cls:"msg", text:msg}));
+    return box;
   }
 
   function resting(list, round, players){
@@ -1704,6 +1752,24 @@ details.how .rules li{font-size:15.5px}
     card.appendChild(btn); card.appendChild(msg);
     return card;
   }
+  // For captains: players left with fewer games in a saved schedule, with an extra round they can add.
+  function extraRoundCard(main, stop, ms){
+    var sf = shortfall(ms.map(function(m){ return {cup:m.cup || "Cup", a:m.a, b:m.b}; }), stop.players, stop.setup && stop.setup.fixed);
+    if (!sf.length) return;
+    var key = "x" + stop.id, card = el("div",{cls:"card"},[el("h3",{text:"Captain's note"})]);
+    card.appendChild(shortCard(sf, function(){
+      var r = maxRound(ms) + 1, last = ms.filter(function(m){ return m.round === r - 1; })[0], ct = 0, list = [];
+      var tm = last && last.time ? laterTime(last.time, roundMins(mkFromStop(stop))) : "";
+      sf.forEach(function(x){ x.games.forEach(function(g){ list.push({round:r, court:++ct, time:tm, cup:g.cup, a1:g.a[0], a2:g.a[1], b1:g.b[0], b2:g.b[1]}); }); });
+      UI.xBusy = key; UI.xMsg = ""; render();
+      hostPost({action:"addRound", stop:stop.id, round:r, matches:list}).then(function(res){
+        UI.xBusy = null;
+        if (res.ok) load(); else UI.xMsg = res.error || "Couldn't reach the Google Sheet. Try again.";
+        render();
+      });
+    }, UI.xBusy === key, UI.xMsg));
+    main.appendChild(card);
+  }
   function nextRoundCard(stop, ms){
     var card = el("div",{cls:"card"},[el("h3",{text:"Mexicano rounds"})]);
     var last = maxRound(ms), planned = stop.rounds || 0, ready = ms.every(scored);
@@ -2256,6 +2322,15 @@ details.how .rules li{font-size:15.5px}
       var counts = picked.map(function(id){ return playing[id] || 0; });
       card.appendChild(el("p",{cls:"note", text: mk.format === "mexicano" ? "This is round " + r0 + (mk.rounds ? " of " + mk.rounds : "") + ". You'll make each next round from Game On once the scores are in." : (mk.sched.length + " games over " + (rounds - r0 + 1) + " rounds. Everyone plays " + (Math.min.apply(null, counts) === Math.max.apply(null, counts) ? counts[0] : Math.min.apply(null, counts) + " to " + Math.max.apply(null, counts)) + " games." + (mk.cut ? " Every pair meeting every other pair would take " + mk.cut + " rounds, so only the first " + rounds + " fit in your court time." : (fitRounds(mk) ? "" : " Add the court times above to fit the rounds to your booking.")))}));
       card.appendChild(pv);
+      // Tell the captain when some players get fewer games, and offer an extra round for them
+      if (mk.format !== "mexicano" && fromRound === 1){
+        var sf = shortfall(mk.sched.map(function(m){ return {cup:m.cup, a:[m.a1, m.a2], b:[m.b1, m.b2]}; }), picked, mk.setup && mk.setup.fixed);
+        if (sf.length) card.appendChild(shortCard(sf, function(){
+          var r = rounds + 1, last = mk.sched.filter(function(m){ return m.round === rounds; })[0], ct = 0;
+          sf.forEach(function(x){ x.games.forEach(function(g){ mk.sched.push({round:r, court:++ct, time: last && last.time ? laterTime(last.time, roundMins(mk)) : "", cup:g.cup, a1:g.a[0], a2:g.a[1], b1:g.b[0], b2:g.b[1]}); }); });
+          commit();
+        }));
+      }
     }
     card.appendChild(smsg);
 
