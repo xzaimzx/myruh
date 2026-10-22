@@ -1174,7 +1174,7 @@ details.how .rules li{font-size:15.5px}
     var tIn = el("input",{type:"text", placeholder:"e.g. 9:00", value:am.time});
     tIn.addEventListener("input", function(){ am.time = tIn.value; });
     var sels = [0,1,2,3].map(function(i){ var s = el("select"); playerOptions(s, i < 2 ? "Team 1 player" : "Team 2 player"); s.value = am.ids[i]; s.addEventListener("change", function(){ am.ids[i] = s.value; }); s.style.marginBottom = "6px"; return s; });
-    var msg = el("div",{cls:"msg"});
+    var msg = el("div",{cls:"msg", text:am.msg || ""});
     card.appendChild(el("div",{cls:"field"},[el("label",{text:"Cup"}), cupIn, dl]));
     card.appendChild(el("div",{cls:"grid3"},[el("div",{cls:"field"},[el("label",{text:"Round"}), rIn]), el("div",{cls:"field"},[el("label",{text:"Court"}), cIn]), el("div",{cls:"field"},[el("label",{text:"Time"}), tIn])]));
     card.appendChild(el("div",{cls:"field"},[el("label",{text:"Team 1"}), sels[0], sels[1]]));
@@ -1190,7 +1190,7 @@ details.how .rules li{font-size:15.5px}
       adminPost({action:"addMatch", stop:stop.id, cup:cup, cupIdx:cupIdx, round:rIn.value, court:cIn.value, time:tIn.value, a1:ids[0], a2:ids[1], b1:ids[2], b2:ids[3]}).then(function(res){
         btn.disabled = false; btn.textContent = "Add match";
         if (res.ok){ delete UI.am[stop.id]; document.activeElement && document.activeElement.blur && document.activeElement.blur(); load(); }
-        else msg.textContent = res.error;
+        else msg.textContent = am.msg = res.error;
       });
     }});
     card.appendChild(btn);
@@ -2219,7 +2219,8 @@ details.how .rules li{font-size:15.5px}
   document.querySelectorAll("nav.tabs button").forEach(function(b){
     b.addEventListener("click", function(){ UI.tab = b.dataset.tab; lsSet("mt-tab", UI.tab); render(); window.scrollTo(0,0); });
   });
-  document.addEventListener("focusout", function(){ setTimeout(function(){ if (UI.pendingRender) render(); }, 0); });
+  // Waits a moment so a tap on a button (like Add match) lands before the page is redrawn.
+  document.addEventListener("focusout", function(){ setTimeout(function(){ if (UI.pendingRender) render(); }, 400); });
 
   try { var cached = JSON.parse(lsGet("mt-cache") || "null"); if (cached && cached.ok && configured){ apply(cached); S.state = "ready"; } } catch(e){}
   render();
