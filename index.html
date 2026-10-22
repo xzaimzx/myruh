@@ -1972,7 +1972,7 @@ details.how .rules li{font-size:15.5px}
     mine.forEach(function(s){
       var ms = stopMatches(s.id), dn = ms.filter(scored).length;
       var stat = isDone(s) ? "Finished" : (dn ? dn + " of " + ms.length + " scored" : (ms.length ? "Not started" : "Sign-ups open" + (s.closes ? " until " + fmtDate(s.closes) : "")));
-      var row = el("div",{cls:"evrow"},[el("div",null,[el("b",{text:s.name}), el("div",{cls:"sub", text:[fmtDate(s.date), stat].filter(Boolean).join("  ·  ")})])]);
+      var row = el("div",{cls:"evrow"},[el("div",null,[el("b",{text:s.name}), el("div",{cls:"sub", text:[fmtDate(s.date), s.venue, stat].filter(Boolean).join("  ·  ")})])]);
       var acts = el("div",{cls:"evacts"});
       if (s.level && !isDone(s)) acts.appendChild(el("button",{cls:"linkbtn", text:"Players", onclick:function(){ UI.edit = s.id; UI.ed = null; render(); var e = document.getElementById("editcard"); if (e) e.scrollIntoView(); }}));
       if (s.level && !isDone(s)) acts.appendChild(el("button",{cls:"linkbtn", text:"Share", onclick:function(){ openShare(announceText(s)); }}));
