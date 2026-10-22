@@ -994,11 +994,11 @@ details.how .rules li{font-size:15.5px}
     card.appendChild(seg);
     var rows = dayRows(dt, UI.dayKind);
     card.appendChild(el("p",{cls:"note", text:(UI.dayKind === "all" ? "Only players who played in every linked event can be All Events Champion of the Day. " : "") + "Ranked by average share of each game won (14–10 is 58%), so points and match scores count the same and playing more games is no advantage. Ties go to whoever won more of their games. " + (dt.done ? (final ? "Final standings." : dt.done + " of " + dt.total + " games scored. Champions are confirmed once every game is in.") : "Standings appear as soon as the first score is in.")}));
-    var md = ["🥇","🥈","🥉"], tb = el("tbody"), shown = dt.done > 0;
+    var tb = el("tbody"), shown = dt.done > 0;
     if (!rows.length) card.appendChild(el("p",{cls:"note", text: UI.dayKind === "all" ? "Nobody is playing in every linked event." : "No players here."}));
     rows.forEach(function(r, i){
-      tb.appendChild(el("tr",{cls: shown && i < 3 ? "podium" : null},[
-        el("td",{cls:"rk", text: shown && i < 3 ? md[i] : String(i + 1)}),
+      tb.appendChild(el("tr",{cls: shown && !i ? "podium" : null},[
+        el("td",{cls:"rk", text: shown && !i ? "🏆" : String(i + 1)}),
         el("td",null,[el("b",{text:nameOf(r.id)}), el("div",{cls:"sub", text: r.g ? r.w + "W" + (r.d ? " " + r.d + "D" : "") + " from " + r.g + (r.g === 1 ? " game" : " games") : "No games yet"})]),
         el("td",{cls:"pts", text: r.g ? Math.round(r.sh / r.g * 100) + "%" : "–"})
       ]));
@@ -1008,12 +1008,13 @@ details.how .rules li{font-size:15.5px}
     return card;
   }
   function dayText(group, dt){
-    var out = ["🏆 *DAY CHAMPIONS* 🏆", group.map(function(s){ return s.name; }).join(" + ") + " · " + fmtDate(group[0].date), ""], md = ["🥇","🥈","🥉"];
+    var out = ["🏆 *DAY CHAMPIONS* 🏆", group.map(function(s){ return s.name; }).join(" + ") + " · " + fmtDate(group[0].date), ""];
+    var titles = {all:"All Events Champion of the Day", M:"Men's Champion", F:"Ladies' Champion"};
     DAY_KINDS.forEach(function(k){
-      var rows = dayRows(dt, k[0]).filter(function(r){ return r.g; }).slice(0, 3);
-      if (!rows.length) return;
-      out.push("*" + (k[0] === "all" ? "All Events Champion of the Day" : k[1]) + "*");
-      rows.forEach(function(r, i){ out.push(md[i] + " " + nameOf(r.id) + " – " + Math.round(r.sh / r.g * 100) + "% (" + r.w + "W/" + (r.d ? r.d + "D/" : "") + r.g + "P)"); });
+      var r = dayRows(dt, k[0]).filter(function(x){ return x.g; })[0];
+      if (!r) return;
+      out.push("*" + titles[k[0]] + "*");
+      out.push("🏆 " + nameOf(r.id) + " – " + Math.round(r.sh / r.g * 100) + "% (" + r.w + "W/" + (r.d ? r.d + "D/" : "") + r.g + "P)");
       out.push("");
     });
     if (dt.done < dt.total) out.push("_" + dt.done + " of " + dt.total + " games scored so far._");
