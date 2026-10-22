@@ -1097,6 +1097,12 @@ details.how .rules li{font-size:15.5px}
   }
 
   // The sheet's Rules tab is the house rules. Each format adds its own lines on top.
+  // Everyone serves the same number of points: the total split 4 ways, served in a row (21 leaves one deciding point).
+  function serveTurns(tot){
+    var each = Math.floor(tot / 4), extra = tot - each * 4;
+    return "Each player serves " + each + " points in a row, then the serve passes on, so everyone serves " + each + " times." +
+      (extra ? " If it reaches " + Math.floor(tot / 2) + "–" + Math.floor(tot / 2) + ", the next player in turn serves the last point." : "");
+  }
   function eventRules(stop){
     var base = S.rules || DEFAULT_RULES, f = stop && stop.format;
     if (!f || !FORMATS[f] || (stop.setup && stop.setup.tbd)) return base;
@@ -1118,13 +1124,17 @@ details.how .rules li{font-size:15.5px}
     var tot = stop.total || 21, even = tot % 2 === 0, half = Math.floor(tot / 2);
     var serveRule = isGames(stop) ? "On match point, men may not serve to ladies." :
       (even ? "On the last point (when the two scores add up to " + (tot - 1) + "), men may not serve to ladies." : "At " + half + "–" + half + " (the last point), men may not serve to ladies.");
+    var served = false;
     if (FORMATS[f].points) base.forEach(function(r){
       if (/^Every game is \d+ points/.test(r)){ if (stop.total) out.push("Every game is " + tot + " points in total" + (even ? ", so draws (" + half + "–" + half + ") are allowed." : ". No draws.")); }
       else if (/10[–-]10|men (may not|can't|cannot) serve/i.test(r)){ if (!su.split) out.push(serveRule); }
+      else if (/^serve (rotates|changes)/i.test(r)){ out.push(serveTurns(tot)); served = true; }
       else if (/^Highest points wins/i.test(r)) out.push(su.split ? "Highest points wins, one winner among the men and one among the ladies." : "Highest points wins the event.");
       else out.push(r);
     });
-    else {
+    if (FORMATS[f].points && !served) out.push(serveTurns(tot));
+    if (!FORMATS[f].points){
+      out.push("The serve changes every game, as in normal padel, so each player serves in turn.");
       if (!su.split) out.push(serveRule);
       out.push("Highest games won wins the event.");
     }
