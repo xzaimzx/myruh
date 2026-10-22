@@ -180,6 +180,7 @@ function handle(req) {
     case 'visit': return addVisit(req);
     case 'deleteEvent': return deleteEvent(req);
     case 'linkEvents': return linkEvents(req);
+    case 'setCourtNames': return setCourtNames(req);
     case 'addStop': return admin(req) || addStop(req);
     case 'addMatch': return admin(req) || addMatch(req);
     case 'deleteMatch': return admin(req) || deleteMatch(req);
@@ -304,16 +305,19 @@ function setupText(setup, players) {
   });
   var hm = /^\d{1,2}:\d{2}$/, times = (setup.courtTimes || []).slice(0, 8).filter(function (t) { return t && hm.test(t[0]) && hm.test(t[1]); }).map(function (t) { return [t[0], t[1]]; });
   var sets = setup.sets === '1' || setup.sets === '3' ? setup.sets : '';
-  if (!setup.split && !setup.mixed && !setup.rotate && !fixed.length && !times.length && !sets && !setup.tbd) return '';
+  var names = (setup.courtNames || []).slice(0, 4).map(function (n) { return cleanText(n, 12); });
+  if (!names.some(String)) names = [];
+  if (!setup.split && !setup.mixed && !setup.rotate && !fixed.length && !times.length && !sets && !setup.tbd && !names.length) return '';
   var o = { split: !!setup.split, mixed: !setup.split && !!setup.mixed, rotate: !!setup.rotate, fixed: fixed };
   if (times.length) o.courtTimes = times;
   if (sets) o.sets = sets;
   if (setup.tbd) o.tbd = true;   // format to be picked once sign-ups close
+  if (names.length) o.courtNames = names;   // the courts' real numbers or names at the venue
   return JSON.stringify(o);
 }
 
 function parseSetup(text) {
-  try { var o = JSON.parse(text); return { split: !!o.split, mixed: !!o.mixed, rotate: !!o.rotate, fixed: o.fixed || [], courtTimes: o.courtTimes || null, sets: o.sets || '', tbd: !!o.tbd }; } catch (e) { return { split: false, fixed: [] }; }
+  try { var o = JSON.parse(text); return { split: !!o.split, mixed: !!o.mixed, rotate: !!o.rotate, fixed: o.fixed || [], courtTimes: o.courtTimes || null, sets: o.sets || '', tbd: !!o.tbd, courtNames: o.courtNames || [] }; } catch (e) { return { split: false, fixed: [] }; }
 }
 
 // One row per visit: a random id for the browser (not a person), and the rough city from the visitor's connection. No IP addresses are stored.
@@ -449,6 +453,20 @@ function addRound(req) {
   if (!out.length) return { ok: false, error: 'No games to add.' };
   var sh = sheet('Matches');
   sh.getRange(sh.getLastRow() + 1, 1, out.length, out[0].length).setValues(out);
+  return { ok: true };
+}
+
+// Renames an event's courts (e.g. Court 5 and Court 7) without touching its schedule.
+function setCourtNames(req) {
+  var c = host(req);
+  if (c.error) return c.error;
+  var stop = rows('Stops').filter(function (s) { return s.id === String(req.stop); })[0];
+  if (!stop) return { ok: false, error: 'That event no longer exists.' };
+  if (!ownsStop(c, stop)) return { ok: false, error: 'Only ' + stop.host + ' or the organiser can rename the courts.' };
+  var setup = {}; try { setup = JSON.parse(stop.setup) || {}; } catch (e) {}
+  setup.courtNames = req.courtNames || [];
+  var sh = sheet('Stops');
+  sh.getRange(findRow(sh, stop.id), TABS.Stops.indexOf('setup') + 1).setValue(setupText(setup, stop.players ? stop.players.split(',') : []));
   return { ok: true };
 }
 
