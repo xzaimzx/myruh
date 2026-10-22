@@ -818,7 +818,6 @@ details.rk-how p{margin:8px 0 0}
     ]
   }];
   function renderNews(main){
-    visitsCard(main);
     NEWS.forEach(function(n){
       var body = el("div",{cls:"body"},[el("div",{cls:"kicker", text:n.kicker}), el("h2",{text:n.title})]);
       n.intro.forEach(function(t){ body.appendChild(el("p",{text:t})); });
@@ -834,6 +833,7 @@ details.rk-how p{margin:8px 0 0}
       });
       main.appendChild(el("article",{cls:"story"},[el("img",{src:n.hero, alt:n.heroAlt}), body, commentsBox(n.id)]));
     });
+    visitsCard(main);
   }
 
   // Comments are saved in the sheet's Comments tab. Posting needs a name and the weekly Score PIN.
