@@ -591,7 +591,44 @@ details.how .rules li{font-size:15.5px}
     }
   }
 
+  // Challenge trophies: the Men's and Ladies' champions of each Tour Stop hold the trophy until the next one, where they
+  // must bring it back and defend it. Tour Stop 1 only had the Men's trophy; the Ladies' trophy starts at Tour Stop 2.
+  var TROPHY_START = {M:{id:"du", stop:1}};
+  function tourStops(){
+    var by = {};
+    sortedStops().forEach(function(s){ var m = /^Tour Stop (\d+)/i.exec(s.name || ""); if (m) (by[m[1]] = by[m[1]] || []).push(s); });
+    return Object.keys(by).map(Number).sort(function(a, b){ return a - b; }).map(function(n){ return {n:n, stops:by[n]}; });
+  }
+  function holders(){
+    var h = {M:null, F:null};
+    Object.keys(TROPHY_START).forEach(function(k){ var t = TROPHY_START[k]; h[k] = {id:t.id, since:t.stop, defended:0}; });
+    tourStops().forEach(function(ts){
+      if (ts.n < 2) return;
+      var ms = []; ts.stops.forEach(function(s){ ms = ms.concat(stopMatches(s.id)); });
+      if (!ms.length || !ms.every(scored)) return;
+      var dt = dayTable(ts.stops);
+      ["M","F"].forEach(function(k){
+        var top = dt.rows.filter(function(r){ return r.g && (S.players[r.id].gender === "F" ? "F" : "M") === k; })[0];
+        if (!top) return;   // nobody of that group played: the holder keeps it
+        if (h[k] && h[k].id === top.id) h[k].defended++; else h[k] = {id:top.id, since:ts.n, defended:0};
+      });
+    });
+    return h;
+  }
+  function holdersCard(main){
+    var h = holders(), card = el("div",{cls:"card"},[el("h3",{text:"🏆 Challenge trophy holders"})]);
+    [["M","Men's trophy"],["F","Ladies' trophy"]].forEach(function(k){
+      var x = h[k[0]];
+      card.appendChild(el("div",{cls:"evrow"},[el("div",null,[el("b",{text:k[1]}),
+        el("div",{cls:"sub", text: x ? "Won at Tour Stop " + x.since + (x.defended ? ", defended " + x.defended + (x.defended === 1 ? " time" : " times") : "") : "Up for grabs at Tour Stop 2"})]),
+        el("b",{text: x && S.players[x.id] ? nameOf(x.id) : "–"})]));
+    });
+    card.appendChild(el("p",{cls:"note", text:"The holder brings the trophy back to the next Tour Stop to defend it. The top man and the top lady of that Tour Stop take it home."}));
+    main.appendChild(card);
+  }
+
   function renderRank(main){
+    holdersCard(main);
     var C = compute();
     var seg = el("div",{cls:"seg", role:"group", "aria-label":"Ranking"});
     [["M","Men"],["F","Women"],["D","Doubles"]].forEach(function(o){
@@ -692,6 +729,7 @@ details.how .rules li{font-size:15.5px}
     var stop = currentStop();
     if (!stop){ main.appendChild(el("div",{cls:"empty", text:"No games yet. Court Captains can set one up in the Court Captains tab."})); return; }
     if (!live.length) main.appendChild(el("p",{cls:"note", text:"Nothing coming up right now, so here are the latest results. New events appear here as soon as a Court Captain creates them."}));
+    if (/^Tour Stop/i.test(stop.name || "")) holdersCard(main);
     renderStopBody(main, stop);
   }
 
@@ -756,19 +794,19 @@ details.how .rules li{font-size:15.5px}
   var NEWS = [{
     id: "stop1-results",
     kicker: "Tour Stop 1 · Sat 17 Oct 2026 · Padel In Ar Rabwah",
-    title: "Fakri and Du crowned on a big opening day",
+    title: "Fakri and Redzuan (Du) crowned on a big opening day",
     hero: "img/news/stop1-group.webp", heroAlt: "All the Tour Stop 1 players lined up at the net with their racquets",
-    intro: ["The MYRUH Padelers Tour is officially up and running. Thirteen players, two courts, 24 games and a lot of noise at Padel In Ar Rabwah, and when the dust settled we had two champions: Fakri G took the Mixed Mayhem Cup and Du took the Smash Showdown Cup."],
+    intro: ["The MYRUH Padelers Tour is officially up and running. Thirteen players, two courts, 24 games and a lot of noise at Padel In Ar Rabwah, and when the dust settled we had two champions: Fakri G took the Mixed Mayhem Cup and Redzuan (Du) took the Smash Showdown Cup."],
     facts: [["24","games played"],["504","points won"],["16–5","biggest win (twice)"]],
-    photos: [["img/news/stop1-fakri.webp","Mixed Mayhem champion Fakri G receiving his trophy","Fakri G, Mixed Mayhem champion"],["img/news/stop1-du.webp","Smash Showdown champion Du celebrating with his trophy","Du, Smash Showdown champion"]],
+    photos: [["img/news/stop1-fakri.webp","Mixed Mayhem champion Fakri G receiving his trophy","Fakri G, Mixed Mayhem champion"],["img/news/stop1-du.webp","Smash Showdown champion Redzuan (Du) celebrating with his trophy","Redzuan (Du), Smash Showdown champion"]],
     sections: [
       ["Mixed Mayhem: Fakri wins it on head-to-head", [
         "Fakri G finished on 49 points with 3 wins from 4, dead level with Qayyum Z on both points and wins. The tie-breaker went to the only time they met: in the very first round Fakri and Shazwan AR beat Qayyum and Amir AJ 12–9, and that was enough.",
-        "Fakri opened with that 12–9 win, then lost a heart-breaker 10–11 alongside Amir AJ. He answered straight away, edging Omar H and Amiza 11–10 with Amirul I, and saved his best for last. Paired with Du in round 6, he won 16–5, the biggest score of the cup."
+        "Fakri opened with that 12–9 win, then lost a heart-breaker 10–11 alongside Amir AJ. He answered straight away, edging Omar H and Amiza 11–10 with Amirul I, and saved his best for last. Paired with Redzuan (Du) in round 6, he won 16–5, the biggest score of the cup."
       ]],
-      ["Smash Showdown: Du takes the crown", [
-        "Du came into the second cup unbeaten after going 3 from 3 in Mixed Mayhem, and he started Smash Showdown the same way. He won 14–7 with Fakri in round 1 and 14–7 again with Amir AJ in round 3.",
-        "Two 10–11 losses in the middle tested him, but Du closed the morning with a 12–9 win alongside Zaim Z to finish on 60 points and the Smash Showdown trophy. Across both cups he played 8 games, won 6 and collected 99 points."
+      ["Smash Showdown: Redzuan (Du) takes the crown", [
+        "Redzuan (Du) came into the second cup unbeaten after going 3 from 3 in Mixed Mayhem, and he started Smash Showdown the same way. He won 14–7 with Fakri in round 1 and 14–7 again with Amir AJ in round 3.",
+        "Two 10–11 losses in the middle tested him, but Redzuan (Du) closed the morning with a 12–9 win alongside Zaim Z to finish on 60 points and the Smash Showdown trophy. Across both cups he played 8 games, won 6 and collected 99 points."
       ]],
       ["Shout-outs", [
         "Amir AJ was the man of the Smash Showdown, winning all 5 of his games for 63 points. Shazwan AR won all 4 of his Mixed Mayhem games. Fakri G also hit back-to-back 15–6 wins in Smash for 53 points, making him the top scorer of the day with 102 points.",

@@ -82,7 +82,7 @@ function setup() {
     var roster = [
       ['omar', 'Omar H', 'M'], ['miza', 'Amiza', 'F'], ['faisal', 'Faisal J', 'M'], ['ain', 'NF Ain', 'F'],
       ['zaim', 'Zaim Z', 'M'], ['farah', 'Farah AN', 'F'], ['shazwan', 'Shazwan AR', 'M'], ['fakhri', 'Fakri G', 'M'],
-      ['qayyum', 'Qayyum Z', 'M'], ['amir', 'Amir AJ', 'M'], ['derek', 'Derek P', 'M'], ['du', 'Du', 'M'],
+      ['qayyum', 'Qayyum Z', 'M'], ['amir', 'Amir AJ', 'M'], ['derek', 'Derek P', 'M'], ['du', 'Redzuan (Du)', 'M'],
       ['amirul', 'Amirul I', 'M']
     ];
     players.getRange(2, 1, roster.length, 4).setValues(roster.map(function (r) { return r.concat([now]); }));
@@ -132,7 +132,7 @@ function updateNames() {
   var names = {
     omar: 'Omar H', miza: 'Amiza', faisal: 'Faisal J', ain: 'NF Ain', zaim: 'Zaim Z', farah: 'Farah AN',
     shazwan: 'Shazwan AR', fakhri: 'Fakri G', qayyum: 'Qayyum Z', amir: 'Amir AJ', derek: 'Derek P',
-    du: 'Du', amirul: 'Amirul I'
+    du: 'Redzuan (Du)', amirul: 'Amirul I'
   };
   var sh = sheet('Players'), n = sh.getLastRow() - 1;
   if (n < 1) return;
