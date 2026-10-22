@@ -938,12 +938,13 @@ details.how .rules li{font-size:15.5px}
     var list = byCup[UI.cup], done = list.filter(scored).length, final = done === list.length;
     var rows = cupTable(list, stop), avg = rows.avg;
     var unit = isGames(stop) ? "games" : "points";
-    card.appendChild(el("p",{cls:"note", text:(avg ? "Players had different numbers of games, so the ranking is by average " + unit + " per game, then by share of matches won. " : "Ranked by total " + unit + " won, then by matches won to break a tie. ") + (done ? (final ? "Final standings." : done + " of " + list.length + " games scored. Medals are confirmed once every game is in.") : "Standings appear as soon as the first score is in.")}));
-    var md = ["🥇","🥈","🥉"];
+    card.appendChild(el("p",{cls:"note", text:(avg ? "Players had different numbers of games, so the ranking is by average " + unit + " per game, then by share of matches won. " : "Ranked by total " + unit + " won, then by matches won to break a tie. ") + (done ? (final ? "Final standings." : done + " of " + list.length + " games scored. " + (stop.level ? "The winner is" : "Medals are") + " confirmed once every game is in.") : "Standings appear as soon as the first score is in.")}));
+    // Events made by Court Captains crown one winner; Tour Stop 1 handed out medals to the top 3.
+    var md = podium(stop);
     var tb = el("tbody");
     rows.forEach(function(r,i){
-      var rk = done && i < 3 ? md[i] : String(i+1);
-      tb.appendChild(el("tr",{cls: done && i < 3 ? "podium" : null},[
+      var rk = done && i < md.length ? md[i] : String(i+1);
+      tb.appendChild(el("tr",{cls: done && i < md.length ? "podium" : null},[
         el("td",{cls:"rk", text:rk}),
         el("td",null,[el("b",{text:nameOf(r.id)}), el("div",{cls:"sub", text: (r.g ? ((avg ? r.pts + " " + unit + "  ·  " : "") + r.w + "W from " + r.g + (r.g === 1 ? " game" : " games") + "  ·  " + Math.round(r.won / r.all * 100) + "% of " + unit) : "No games yet") + (r.fill ? "  ·  filled in " + r.fill + (r.fill === 1 ? " game" : " games") + " (not counted)" : "")})]),
         el("td",{cls:"pts", text: avg ? (r.g ? (r.pts / r.g).toFixed(1) : "–") : String(r.pts)})
@@ -1041,7 +1042,7 @@ details.how .rules li{font-size:15.5px}
           var rest = resting(byCup[c], m.round);
           out.push("*R" + m.round + (m.time ? " " + m.time : "") + "*" + (rest.length ? "  (rest: " + rest.map(nameOf).join(", ") + ")" : ""));
         }
-        out.push("C" + (m.court || "?") + "  " + pairName(m.a) + " v " + pairName(m.b));
+        out.push((m.court ? courtName(stop, m.court, true) : "C?") + "  " + pairName(m.a) + " v " + pairName(m.b));
       });
     });
     return out.join("\n");
@@ -1094,8 +1095,9 @@ details.how .rules li{font-size:15.5px}
     return card;
   }
 
+  function podium(stop){ return stop.level ? ["🏆"] : ["🥇","🥈","🥉"]; }
   function stopText(stop, cups, byCup){
-    var out = ["🎾 *" + stop.name.toUpperCase() + "* 🎾", ""]; var md = ["🥇","🥈","🥉"];
+    var out = ["🎾 *" + stop.name.toUpperCase() + "* 🎾", ""]; var md = podium(stop);
     cups.forEach(function(c){ var t = cupTable(byCup[c], stop); if (!t.length) return; out.push("*" + c + "*");
       t.forEach(function(r,i){ if (!r.g) return; out.push((md[i] || (i+1) + ".") + " " + nameOf(r.id) + " – " + (t.avg ? (r.pts / r.g).toFixed(1) + " avg, " : "") + r.pts + " pts (" + r.w + "W/" + r.g + "P)"); }); out.push(""); });
     return out.join("\n").trim();
@@ -1105,7 +1107,8 @@ details.how .rules li{font-size:15.5px}
   var timers = {};
   function matchCard(m, stop){
     var card = el("div",{cls:"match"});
-    card.appendChild(el("div",{cls:"ct", text: m.court ? "C" + m.court : "–"}));
+    var ctl = m.court ? courtName(stop, m.court, true) : "–";
+    card.appendChild(el("div",{cls:"ct", text:ctl, style: ctl.length > 3 ? "font-size:11px;line-height:1.1;text-align:center;word-break:break-word;padding:2px" : null}));
     var sides = el("div");
     var fin = scored(m), wn = fin ? winOf(m) : null;
     if (stop.format === "full") return setsCard(m, stop, card, fin, wn);
@@ -1238,7 +1241,7 @@ details.how .rules li{font-size:15.5px}
     var dl = el("datalist",{id:"cupList"}); cups.forEach(function(c){ dl.appendChild(el("option",{value:c})); });
     var rIn = el("input",{type:"text", inputmode:"numeric", value:am.round});
     rIn.addEventListener("input", function(){ am.round = rIn.value; });
-    var cIn = el("select"); ["1","2","3","4"].forEach(function(c){ cIn.appendChild(el("option",{value:c, text:"Court " + c, selected: am.court === c ? "selected" : null})); });
+    var cIn = el("select"); ["1","2","3","4"].forEach(function(c){ cIn.appendChild(el("option",{value:c, text:courtName(stop, +c), selected: am.court === c ? "selected" : null})); });
     cIn.addEventListener("change", function(){ am.court = cIn.value; });
     var tIn = el("input",{type:"text", placeholder:"e.g. 9:00", value:am.time});
     tIn.addEventListener("input", function(){ am.time = tIn.value; });
@@ -1335,7 +1338,31 @@ details.how .rules li{font-size:15.5px}
     for (var k in extra) o[k] = extra[k];
     if (mk.format === "full") o.sets = mk.sets || "3";
     if (usePlan(mk)) o.courtTimes = courtTimesOf(mk);
+    var names = cleanCourtNames(mk);
+    if (names.length) o.courtNames = names;
     return o;
+  }
+  // Courts can be named after the venue's own numbers (e.g. 5 and 7) or names. Short form for score cards: "C5".
+  function courtNames(x){ return (x && (x.courtNames || (x.setup && x.setup.courtNames))) || []; }
+  function courtName(x, n, short){
+    var nm = String(courtNames(x)[n - 1] || "").trim(), num = /^(?:court\s*)?(\d+)$/i.exec(nm);
+    if (!nm || num) { var k = num ? num[1] : n; return short ? "C" + k : "Court " + k; }
+    return nm;
+  }
+  function cleanCourtNames(mk){
+    var names = (mk.courtNames || []).slice(0, mk.courts).map(function(v){ return String(v || "").trim().slice(0, 12); });
+    return names.some(String) ? names : [];
+  }
+  function courtNamesUI(mk, card, field, onChange){
+    mk.courtNames = mk.courtNames || [];
+    var row = el("div",{cls:"grid2"});
+    for (var c = 1; c <= mk.courts; c++) (function(i){
+      var inp = el("input",{type:"text", maxlength:"12", placeholder:String(i + 1), value:mk.courtNames[i] || "", "aria-label":"Court " + (i + 1) + " name"});
+      inp.addEventListener("input", function(){ mk.courtNames[i] = inp.value; if (onChange) onChange(); });
+      row.appendChild(field("Court " + (i + 1) + " is", inp));
+    })(c - 1);
+    card.appendChild(row);
+    card.appendChild(el("p",{cls:"note", text:"Booked different courts? Type the venue's court numbers, like 5 and 7. Leave blank to use 1, 2, 3."}));
   }
   // Same time for all courts, or a start and end per court.
   function courtTimesUI(mk, card, field, changed, edit){
@@ -1663,7 +1690,7 @@ details.how .rules li{font-size:15.5px}
       var g2 = el("optgroup",{label:"Not in this event"}); others.forEach(function(id){ g2.appendChild(el("option",{value:id, text:nameOf(id), selected: sw.picks[m.id] === id ? "selected" : null})); });
       if (others.length) sel.appendChild(g2);
       sel.addEventListener("change", function(){ sw.picks[m.id] = sel.value; commit(); });
-      card.appendChild(el("div",{cls:"field"},[el("label",{text:"Round " + m.round + ", Court " + m.court + (m.time ? ", " + m.time : "") + ": " + m.a.map(nameOf).join(" / ") + " v " + m.b.map(nameOf).join(" / ")}), sel]));
+      card.appendChild(el("div",{cls:"field"},[el("label",{text:"Round " + m.round + ", " + courtName(stop, m.court) + (m.time ? ", " + m.time : "") + ": " + m.a.map(nameOf).join(" / ") + " v " + m.b.map(nameOf).join(" / ")}), sel]));
     });
     var msg = el("div",{cls:"msg"});
     var btn = el("button",{cls:"btn primary wide", text:"Swap " + nameOf(sw.out) + " out", onclick:function(){
@@ -1725,7 +1752,7 @@ details.how .rules li{font-size:15.5px}
     var su = stop.setup || {}, tm = su.courtTimes && su.courtTimes[0] ? su.courtTimes[0] : parseTimes(stop.time);
     var mk = {stopId:stop.id, level:stop.level || "social", format:stop.format || "americano", start:tm[0] || "", end:tm[1] || "", courts:stop.courts || 2, total:stop.total || 21,
       rounds:stop.rounds || 0, players:(stop.players || []).filter(function(id){ return S.players[id]; }), split:!!su.split, mx:!!su.mixed, rotate:!!su.rotate, sets:su.sets || "3",
-      diffTimes:!!(su.courtTimes && su.courtTimes.length > 1), courtTimes:(su.courtTimes || []).slice(1).map(function(t){ return t.slice(); }),
+      courtNames:(su.courtNames || []).slice(), diffTimes:!!(su.courtTimes && su.courtTimes.length > 1), courtTimes:(su.courtTimes || []).slice(1).map(function(t){ return t.slice(); }),
       pairs:null, fixed:[], swap:null, sched:null, newName:"", newGender:"M", similar:null, msg:""};
     if (allPairs(mk)) mk.pairs = (su.fixed || []).map(function(p){ return p.slice(); }); else mk.fixed = (su.fixed || []).map(function(p){ return p.slice(); });
     return mk;
@@ -1974,6 +2001,7 @@ details.how .rules li{font-size:15.5px}
     ct.addEventListener("change", function(){ mk.courts = +ct.value; changed(); commit(); });
     var cl = el("input",{type:"date", value:mk.closes || ""}); cl.addEventListener("input", function(){ mk.closes = cl.value; });
     card.appendChild(el("div",{cls:"grid2"},[field("Courts", ct), field("Sign-ups close", cl)]));
+    courtNamesUI(mk, card, field);
     courtTimesUI(mk, card, field, changed);
 
     // 1. Level and format
@@ -2022,6 +2050,21 @@ details.how .rules li{font-size:15.5px}
     var ct2 = el("select"); [1,2,3,4].forEach(function(n){ ct2.appendChild(el("option",{value:String(n), text:n + (n === 1 ? " court" : " courts"), selected: mk.courts === n ? "selected" : null})); });
     ct2.addEventListener("change", function(){ mk.courts = +ct2.value; changed(); commit(); });
     card.appendChild(field("Courts", ct2));
+    courtNamesUI(mk, card, field, function(){ mk.namesDirty = true; });
+    // Renaming courts doesn't need a new schedule
+    if (sms.length){
+      var nb = el("button",{cls:"btn ghost wide", text:"Save court names", onclick:function(){
+        nb.disabled = true; nb.textContent = "Saving…";
+        hostPost({action:"setCourtNames", stop:stop.id, courtNames:cleanCourtNames(mk)}).then(function(res){
+          nb.disabled = false; nb.textContent = "Save court names";
+          if (res.ok){ stop.setup = stop.setup || {}; stop.setup.courtNames = cleanCourtNames(mk); mk.namesMsg = "Court names saved."; load(true); }
+          else mk.namesMsg = res.error || "Couldn't reach the Google Sheet. Try again.";
+          render();
+        });
+      }});
+      card.appendChild(nb);
+      if (mk.namesMsg) card.appendChild(el("div",{cls:"msg", text:mk.namesMsg}));
+    }
     courtTimesUI(mk, card, field, changed, true);
     card.appendChild(el("p",{cls:"note", text:fitNote(mk)}));
 
@@ -2208,7 +2251,7 @@ details.how .rules li{font-size:15.5px}
         rm.forEach(function(m){ [m.a1,m.a2,m.b1,m.b2].forEach(function(id){ inR[id] = 1; }); });
         var rest = picked.filter(function(id){ return !inR[id]; });
         pv.appendChild(el("div",{cls:"rnd"},["Round " + r + (rm[0].time ? ", " + rm[0].time : ""), rest.length ? el("span",{cls:"rest", text:"  ·  Rest: " + rest.map(nameOf).join(", ")}) : null]));
-        rm.forEach(function(m){ pv.appendChild(el("div",{cls:"pvrow", text:"C" + m.court + "  " + (mixed && mk.split ? m.cup + ": " : "") + nameOf(m.a1) + " / " + nameOf(m.a2) + "  v  " + nameOf(m.b1) + " / " + nameOf(m.b2)})); });
+        rm.forEach(function(m){ pv.appendChild(el("div",{cls:"pvrow", text:courtName(mk, m.court, true) + "  " + (mixed && mk.split ? m.cup + ": " : "") + nameOf(m.a1) + " / " + nameOf(m.a2) + "  v  " + nameOf(m.b1) + " / " + nameOf(m.b2)})); });
       }
       var counts = picked.map(function(id){ return playing[id] || 0; });
       card.appendChild(el("p",{cls:"note", text: mk.format === "mexicano" ? "This is round " + r0 + (mk.rounds ? " of " + mk.rounds : "") + ". You'll make each next round from Game On once the scores are in." : (mk.sched.length + " games over " + (rounds - r0 + 1) + " rounds. Everyone plays " + (Math.min.apply(null, counts) === Math.max.apply(null, counts) ? counts[0] : Math.min.apply(null, counts) + " to " + Math.max.apply(null, counts)) + " games." + (mk.cut ? " Every pair meeting every other pair would take " + mk.cut + " rounds, so only the first " + rounds + " fit in your court time." : (fitRounds(mk) ? "" : " Add the court times above to fit the rounds to your booking.")))}));
