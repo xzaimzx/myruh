@@ -888,6 +888,8 @@ details.how .rules li{font-size:15.5px}
       main.appendChild(su);
     }
     else if (!ms.length) main.appendChild(el("div",{cls:"empty", text: isAdmin() ? "No matches yet. Add them below." : "No matches yet."}));
+    var day = dayGroup(stop);
+    if (day) main.appendChild(dayCard(day));
     if (cups.length) main.appendChild(leaderboard(stop, cups, byCup));
     if (cups.length){
       var lu = el("div",{cls:"card"},[el("h3",{text:"Players at this event"})]);
@@ -951,6 +953,66 @@ details.how .rules li{font-size:15.5px}
     card.appendChild(tbl);
     if (done) card.appendChild(el("button",{cls:"btn ghost wide", text:"Share leaderboard", style:"margin-top:12px", onclick:function(){ openShare(stopText(stop, cups, byCup)); }}));
     return card;
+  }
+
+  // Events on the same day at the same venue are linked: one set of day champions (overall, men, ladies) across all of them.
+  function dayGroup(stop){
+    if (!stop.date || !stop.venue) return null;
+    var v = stop.venue.trim().toLowerCase();
+    var g = sortedStops().filter(function(s){ return s.date === stop.date && (s.venue || "").trim().toLowerCase() === v && stopMatches(s.id).length; });
+    return g.length > 1 ? g : null;
+  }
+  // Points and games are on different scales (24-point Americano, 6-game matches), and some players play more games,
+  // so each player is ranked by their average share of each game won (14–10 is 58%), then by share of games won.
+  function dayTable(group){
+    var t = {}, all = [];
+    group.forEach(function(s){ stopMatches(s.id).forEach(function(m){ all.push(m); }); });
+    all.forEach(function(m){ m.a.concat(m.b).forEach(function(id){ if (!isSub(m, id) && S.players[id]) t[id] = t[id] || {id:id, g:0, w:0, d:0, sh:0}; }); });
+    all.forEach(function(m){ if (!scored(m)) return;
+      var wn = winOf(m), tot = m.sa + m.sb;
+      [[m.a, m.sa, 1], [m.b, m.sb, 0]].forEach(function(sd){ sd[0].forEach(function(id){ var x = t[id]; if (!x || isSub(m, id)) return;
+        x.g++; x.sh += sd[1] / tot; if (wn === sd[2]) x.w++; else if (wn === 0.5) x.d++; }); });
+    });
+    var rows = Object.keys(t).map(function(k){ return t[k]; });
+    function av(x){ return x.g ? x.sh / x.g : -1; }
+    rows.sort(function(a, b){ return av(b) - av(a) || (b.g ? (b.w + b.d / 2) / b.g : 0) - (a.g ? (a.w + a.d / 2) / a.g : 0) || nameOf(a.id).localeCompare(nameOf(b.id)); });
+    var ms = all.length, done = all.filter(scored).length;
+    return {rows:rows, done:done, total:ms};
+  }
+  function dayCard(group){
+    var dt = dayTable(group), final = dt.done === dt.total;
+    var kinds = [["all","Overall"],["M","Men"],["F","Ladies"]];
+    if (!kinds.some(function(k){ return k[0] === UI.dayKind; })) UI.dayKind = "all";
+    var card = el("div",{cls:"card lb"},[el("h3",{text:"🏆 Day champions"})]);
+    card.appendChild(el("p",{cls:"note", text:"Linked events: " + group.map(function(s){ return s.name; }).join(" + ") + ". Every game from these events counts."}));
+    var seg = el("div",{cls:"seg", role:"group", "aria-label":"Champions"});
+    kinds.forEach(function(k){ seg.appendChild(el("button",{text:k[1], "aria-pressed": UI.dayKind === k[0] ? "true" : "false", onclick:function(){ UI.dayKind = k[0]; render(); }})); });
+    card.appendChild(seg);
+    var rows = dt.rows.filter(function(r){ return UI.dayKind === "all" || (S.players[r.id].gender === "F" ? "F" : "M") === UI.dayKind; });
+    card.appendChild(el("p",{cls:"note", text:"Ranked by average share of each game won (14–10 is 58%), so points and match scores count the same and playing more games is no advantage. Ties go to whoever won more of their games. " + (dt.done ? (final ? "Final standings." : dt.done + " of " + dt.total + " games scored. Champions are confirmed once every game is in.") : "Standings appear as soon as the first score is in.")}));
+    var md = ["🥇","🥈","🥉"], tb = el("tbody"), shown = dt.done > 0;
+    rows.forEach(function(r, i){
+      tb.appendChild(el("tr",{cls: shown && i < 3 ? "podium" : null},[
+        el("td",{cls:"rk", text: shown && i < 3 ? md[i] : String(i + 1)}),
+        el("td",null,[el("b",{text:nameOf(r.id)}), el("div",{cls:"sub", text: r.g ? r.w + "W" + (r.d ? " " + r.d + "D" : "") + " from " + r.g + (r.g === 1 ? " game" : " games") : "No games yet"})]),
+        el("td",{cls:"pts", text: r.g ? Math.round(r.sh / r.g * 100) + "%" : "–"})
+      ]));
+    });
+    card.appendChild(el("table",{cls:"standings lbt"},[el("thead",null,[el("tr",null,[el("th",{text:"#"}), el("th",{text:"Player"}), el("th",{text:"Avg"})])]), tb]));
+    if (dt.done) card.appendChild(el("button",{cls:"btn ghost wide", text:"Share day champions", style:"margin-top:12px", onclick:function(){ openShare(dayText(group, dt)); }}));
+    return card;
+  }
+  function dayText(group, dt){
+    var out = ["🏆 *DAY CHAMPIONS* 🏆", group.map(function(s){ return s.name; }).join(" + ") + " · " + fmtDate(group[0].date), ""], md = ["🥇","🥈","🥉"];
+    [["all","Overall"],["M","Men"],["F","Ladies"]].forEach(function(k){
+      var rows = dt.rows.filter(function(r){ return r.g && (k[0] === "all" || (S.players[r.id].gender === "F" ? "F" : "M") === k[0]); }).slice(0, 3);
+      if (!rows.length) return;
+      out.push("*" + k[1] + "*");
+      rows.forEach(function(r, i){ out.push(md[i] + " " + nameOf(r.id) + " – " + Math.round(r.sh / r.g * 100) + "% (" + r.w + "W/" + (r.d ? r.d + "D/" : "") + r.g + "P)"); });
+      out.push("");
+    });
+    if (dt.done < dt.total) out.push("_" + dt.done + " of " + dt.total + " games scored so far._");
+    return out.join("\n").trim();
   }
 
   function resting(list, round, players){
