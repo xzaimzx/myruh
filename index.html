@@ -60,6 +60,11 @@ header.top .stripe2{position:absolute;right:120px;top:0;bottom:0;width:14px;back
 nav.tabs{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;gap:5px;padding:calc(12px + env(safe-area-inset-top,0px)) 0 10px;margin-top:calc(-1 * env(safe-area-inset-top,0px));border-bottom:1px solid var(--line)}
 nav.tabs button{flex:1;min-width:0;border:1.5px solid var(--line);background:var(--surface);font-weight:600;font-size:14.5px;line-height:1.15;padding:8px 4px;border-radius:999px;cursor:pointer;white-space:nowrap}
 nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+nav.tabs .more{flex:1;min-width:0;position:relative;display:flex}
+nav.tabs .more > button{flex:1}
+nav.tabs .menu{position:absolute;right:0;top:calc(100% + 6px);z-index:20;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:6px;box-shadow:0 6px 20px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:4px;min-width:170px}
+nav.tabs .menu[hidden]{display:none}
+nav.tabs .menu button{border:0;border-radius:10px;text-align:left;padding:11px 12px;font-size:15px;white-space:nowrap}
 :focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 
 .seg{display:flex;background:var(--chip);border-radius:12px;padding:4px;gap:4px;margin:14px 0 6px}
@@ -257,8 +262,13 @@ details.rk-how p{margin:8px 0 0}
     <button role="tab" data-tab="session" aria-selected="true">Game On</button>
     <button role="tab" data-tab="news" aria-selected="false">Tour News</button>
     <button role="tab" data-tab="tour" aria-selected="false">Tour Rankings</button>
-    <button role="tab" data-tab="past" aria-selected="false">Game History</button>
-    <button role="tab" data-tab="captains" aria-selected="false">Court Captains</button>
+    <div class="more">
+      <button id="moreBtn" aria-haspopup="true" aria-expanded="false" aria-selected="false">More ▾</button>
+      <div class="menu" id="moreMenu" hidden>
+        <button role="tab" data-tab="past" aria-selected="false">Game History</button>
+        <button role="tab" data-tab="captains" aria-selected="false">Court Captains</button>
+      </div>
+    </div>
   </nav>
   <main id="main"></main>
   <div class="org" id="org"></div>
@@ -561,7 +571,11 @@ details.rk-how p{margin:8px 0 0}
     var a = document.activeElement;
     if (a && a.closest && a.closest("#main") && (a.tagName === "INPUT" || a.tagName === "SELECT" || a.tagName === "TEXTAREA")) { UI.pendingRender = true; return; }
     UI.pendingRender = false;
-    document.querySelectorAll("nav.tabs button").forEach(function(b){ b.setAttribute("aria-selected", b.dataset.tab === UI.tab ? "true" : "false"); });
+    document.querySelectorAll("nav.tabs button[data-tab]").forEach(function(b){ b.setAttribute("aria-selected", b.dataset.tab === UI.tab ? "true" : "false"); });
+    // Game History and Court Captains sit under More; while one is open, More shows its name.
+    var inMore = { past:"Game History", captains:"Court Captains" }[UI.tab];
+    var mb = document.getElementById("moreBtn");
+    mb.textContent = (inMore || "More") + " ▾"; mb.setAttribute("aria-selected", inMore ? "true" : "false");
     var main = document.getElementById("main"); main.innerHTML = "";
     renderOrg();
     var up = document.getElementById("updated");
@@ -2545,8 +2559,12 @@ details.rk-how p{margin:8px 0 0}
   adminIn.addEventListener("keydown", function(e){ if (e.key === "Enter") adminSave.click(); });
 
   /* ---------- Start ---------- */
-  document.querySelectorAll("nav.tabs button").forEach(function(b){
-    b.addEventListener("click", function(){ UI.tab = b.dataset.tab; lsSet("mt-tab", UI.tab); render(); window.scrollTo(0,0); });
+  var moreBtn = document.getElementById("moreBtn"), moreMenu = document.getElementById("moreMenu");
+  function showMore(on){ moreMenu.hidden = !on; moreBtn.setAttribute("aria-expanded", on ? "true" : "false"); }
+  moreBtn.addEventListener("click", function(e){ e.stopPropagation(); showMore(moreMenu.hidden); });
+  document.addEventListener("click", function(e){ if (!moreMenu.hidden && !moreMenu.contains(e.target)) showMore(false); });
+  document.querySelectorAll("nav.tabs button[data-tab]").forEach(function(b){
+    b.addEventListener("click", function(){ showMore(false); UI.tab = b.dataset.tab; lsSet("mt-tab", UI.tab); render(); window.scrollTo(0,0); });
   });
   // Waits a moment so a tap on a button (like Add match) lands before the page is redrawn.
   document.addEventListener("focusout", function(){ setTimeout(function(){ if (UI.pendingRender) render(); }, 400); });
