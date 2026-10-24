@@ -110,6 +110,9 @@ nav.tabs .menu button{border:0;border-radius:10px;text-align:left;padding:11px 1
 .mfoot{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid var(--line);padding:0 0 0 10px;min-height:30px}
 .mfoot .by{font-size:12.5px;color:var(--muted)}
 .mfoot .by.err{color:var(--red)}
+.noshow{grid-column:1/-1;display:grid;gap:8px;padding:10px;border-top:1px solid var(--line)}
+.noshow .note{margin:0}
+.noshow select{width:100%}
 .del{border:0;background:transparent;color:var(--muted);font-size:13px;padding:6px 8px;cursor:pointer}
 
 .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin:14px 0}
@@ -490,7 +493,7 @@ details.rk-how p{margin:8px 0 0}
     var stops = sortedStops();
     var order = {}; stops.forEach(function(s,i){ order[s.id] = i; });
     var all = Object.keys(S.matches).map(function(k){ return S.matches[k]; })
-      .filter(function(m){ return scored(m) && order[m.stop] !== undefined && S.players[m.a[0]] && S.players[m.a[1]] && S.players[m.b[0]] && S.players[m.b[1]]; })
+      .filter(function(m){ return scored(m) && !m.wo && order[m.stop] !== undefined && S.players[m.a[0]] && S.players[m.a[1]] && S.players[m.b[0]] && S.players[m.b[1]]; })
       .sort(function(x,y){ return order[x.stop] - order[y.stop] || (x.seq||0) - (y.seq||0); });
     var R = {}, st = {}, PR = {}, ps = {}, before = null, beforeP = null;
     var lastStop = all.length ? all[all.length-1].stop : null;
@@ -1244,8 +1247,13 @@ details.rk-how p{margin:8px 0 0}
     }
     return out;
   }
+  function noShowRules(stop){
+    var f = stop && stop.format, full = f === "full" ? ((stop.setup || {}).sets === "1" ? "6-0" : "6-0 6-0") : (f === "short" ? "6–0" : (stop && stop.total ? stop.total + "–0" : "the full score to 0"));
+    return ["If a pair doesn't come for a game, the Court Captain gives a walkover: the pair that's there wins " + full + ". It counts for the event, but not for the Tour Rankings.",
+      "If one player is missing, the Court Captain can bring in a resting player, or anyone else, for that game only. The game counts for the fill-in's Tour Ranking, but not for their event total."];
+  }
   function rulesCard(stop){
-    var rules = eventRules(stop);
+    var rules = eventRules(stop).concat(noShowRules(stop));
     var card = el("details",{cls:"card how", open:"open"});
     card.appendChild(el("summary",{text:"Rules"}));
     var ol = el("ol",{cls:"rules"});
@@ -1278,6 +1286,7 @@ details.rk-how p{margin:8px 0 0}
       var row = el("div",{cls:"side" + (fin && ((key==="sa" && wn === 1) || (key==="sb" && wn === 0)) ? " won" : "")},[el("div",{cls:"who", text:pairName(ids)})]);
       var inp = el("input",{cls:"sc", type:"text", inputmode:"numeric", pattern:"[0-9]*", maxlength:"3", autocomplete:"off", placeholder:"–", "aria-label":"Score for " + pairName(ids)});
       inp.value = (typeof val === "number") ? String(val) : "";
+      if (m.wo) inp.disabled = true;
       row.appendChild(inp); return {row:row, inp:inp};
     }
     var A = side(m.a, m.sa, "sa"), B = side(m.b, m.sb, "sb");
@@ -1306,13 +1315,15 @@ details.rk-how p{margin:8px 0 0}
     B.inp.addEventListener("input", function(){ onIn(B, A); });
     [A.inp, B.inp].forEach(function(i){ i.addEventListener("blur", save); i.addEventListener("keydown", function(e){ if (e.key === "Enter") i.blur(); }); });
 
-    return matchFoot(m, card, fin);
+    return matchFoot(m, card, fin, stop);
   }
-  function matchFoot(m, card, fin){
+  function matchFoot(m, card, fin, stop){
     var foot = el("div",{cls:"mfoot"});
     var st = status[m.id];
-    var byText = st ? st.text : (m.enteredBy && fin ? "Entered by " + m.enteredBy : "");
+    var byText = st ? st.text : (m.wo ? "Walkover: " + pairName(m[m.wo]) + " didn't come" : (m.enteredBy && fin ? "Entered by " + m.enteredBy : ""));
     foot.appendChild(el("span",{cls:"by" + (st && st.err ? " err" : ""), text: byText}));
+    var cap = stop && canManage(stop) && (!fin || m.wo);
+    if (cap) foot.appendChild(el("button",{cls:"del", text: UI.ns === m.id ? "Close" : "No-show?", "aria-expanded": UI.ns === m.id ? "true" : "false", onclick:function(){ UI.ns = UI.ns === m.id ? null : m.id; render(); }}));
     if (isAdmin()){
       var armed = false;
       var del = el("button",{cls:"del", text:"Delete match", onclick:function(){
@@ -1325,8 +1336,57 @@ details.rk-how p{margin:8px 0 0}
       }});
       foot.appendChild(del);
     }
-    if (byText || isAdmin()) card.appendChild(foot);
+    if (byText || isAdmin() || cap) card.appendChild(foot);
+    if (cap && UI.ns === m.id) card.appendChild(noShowPanel(m, stop));
     return card;
+  }
+  // For captains, one game at a time: a walkover when a pair didn't come, or a fill-in for one player.
+  function noShowPanel(m, stop){
+    var box = el("div",{cls:"noshow"}), msg = el("div",{cls:"msg"});
+    function busy(b, t){ box.querySelectorAll("button,select").forEach(function(x){ x.disabled = b; }); if (t) msg.textContent = t; }
+    function wo(side){
+      busy(true, "Saving…");
+      return hostPost({action:"walkover", matchId:m.id, side:side}).then(function(res){
+        if (!res.ok){ busy(false, res.error || "Couldn't reach the Google Sheet. Try again."); return false; }
+        return true;
+      });
+    }
+    if (m.wo){
+      box.appendChild(el("p",{cls:"note", text:"Walkover: " + pairName(m[m.wo]) + " didn't come, so " + pairName(m[m.wo === "a" ? "b" : "a"]) + " won " + (m.wo === "a" ? m.sb + "–" + m.sa : m.sa + "–" + m.sb) + ". This game doesn't count for the Tour Rankings."}));
+      box.appendChild(el("button",{cls:"btn wide", text:"Undo walkover", onclick:function(){ wo("").then(function(ok){ if (ok){ UI.ns = null; load(); } }); }}));
+      box.appendChild(el("p",{cls:"note", text:"To put a fill-in in this game instead, undo the walkover first."}));
+      box.appendChild(msg);
+      return box;
+    }
+    box.appendChild(el("p",{cls:"note", text:"Pair didn't come? The pair that's there wins this game in full. It counts for the event, not the Tour Rankings."}));
+    ["a","b"].forEach(function(k){ box.appendChild(el("button",{cls:"btn wide", text:pairName(m[k]) + " didn't come", onclick:function(){ wo(k).then(function(ok){ if (ok){ UI.ns = null; load(); } }); }})); });
+    // Replace one player for this game only
+    var ns = UI.nsr && UI.nsr.id === m.id ? UI.nsr : (UI.nsr = {id:m.id, out:"", inn:""});
+    box.appendChild(el("p",{cls:"note", text:"Or replace one player for this game only. The game counts for the fill-in's Tour Ranking, not their event total."}));
+    var four = m.a.concat(m.b), ms = stopMatches(stop.id);
+    var outSel = el("select",{"aria-label":"Who's missing"}); outSel.appendChild(el("option",{value:"", text:"Who's missing?"}));
+    four.forEach(function(id){ outSel.appendChild(el("option",{value:id, text:nameOf(id), selected: ns.out === id ? "selected" : null})); });
+    outSel.addEventListener("change", function(){ ns.out = outSel.value; });
+    var playing = {}; ms.forEach(function(x){ if (x.round === m.round) x.a.concat(x.b).forEach(function(id){ playing[id] = 1; }); });
+    var inEvent = {}; (stop.players || []).forEach(function(id){ inEvent[id] = 1; }); ms.forEach(function(x){ x.a.concat(x.b).forEach(function(id){ inEvent[id] = 1; }); });
+    var byName = function(a, b){ return nameOf(a).localeCompare(nameOf(b)); };
+    var rest = Object.keys(inEvent).filter(function(id){ return S.players[id] && !playing[id]; }).sort(byName);
+    var others = Object.keys(S.players).filter(function(id){ return !inEvent[id]; }).sort(byName);
+    var inSel = el("select",{"aria-label":"Who comes in"}); inSel.appendChild(el("option",{value:"", text:"Who comes in?"}));
+    var g1 = el("optgroup",{label:"Resting this round"}); rest.forEach(function(id){ g1.appendChild(el("option",{value:id, text:nameOf(id), selected: ns.inn === id ? "selected" : null})); });
+    var g2 = el("optgroup",{label:"Anyone else"}); others.forEach(function(id){ g2.appendChild(el("option",{value:id, text:nameOf(id), selected: ns.inn === id ? "selected" : null})); });
+    if (rest.length) inSel.appendChild(g1); if (others.length) inSel.appendChild(g2);
+    inSel.addEventListener("change", function(){ ns.inn = inSel.value; });
+    box.appendChild(el("div",{cls:"field"},[outSel])); box.appendChild(el("div",{cls:"field"},[inSel]));
+    box.appendChild(el("button",{cls:"btn primary wide", text:"Replace for this game", onclick:function(){
+      if (!ns.out || !ns.inn){ msg.textContent = "Pick who's missing and who comes in."; return; }
+      busy(true, "Saving…");
+      hostPost({action:"swapPlayer", stop:stop.id, out:ns.out, swaps:[{id:m.id, "in":ns.inn}], leave:false}).then(function(res){
+        if (res.ok){ UI.ns = null; UI.nsr = null; load(); } else busy(false, res.error || "Couldn't reach the Google Sheet. Try again.");
+      });
+    }}));
+    box.appendChild(msg);
+    return box;
   }
   // Full-set matches: one box for the sets, e.g. "6-4 3-6 7-5". Games are added up for the ratings.
   function parseSets(t){
@@ -1341,6 +1401,7 @@ details.rk-how p{margin:8px 0 0}
     [["a",1],["b",0]].forEach(function(o){ sides.appendChild(el("div",{cls:"side" + (fin && wn === o[1] ? " won" : "")},[el("div",{cls:"who", text:pairName(m[o[0]])})])); });
     var inp = el("input",{cls:"sets", type:"text", autocomplete:"off", placeholder:"Sets, e.g. 6-4 3-6 7-5", "aria-label":"Sets for " + pairName(m.a) + " against " + pairName(m.b)});
     inp.value = m.sets || (fin ? m.sa + "-" + m.sb : "");
+    if (m.wo) inp.disabled = true;
     var hint = el("div",{cls:"sethint", text:"First number is " + pairName(m.a) + "."});
     sides.appendChild(inp); sides.appendChild(hint);
     card.appendChild(sides);
@@ -1354,7 +1415,7 @@ details.rk-how p{margin:8px 0 0}
     }
     inp.addEventListener("blur", save);
     inp.addEventListener("keydown", function(e){ if (e.key === "Enter") inp.blur(); });
-    return matchFoot(m, card, fin);
+    return matchFoot(m, card, fin, stop);
   }
 
   var queued = null;

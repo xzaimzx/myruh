@@ -17,7 +17,7 @@
 var TABS = {
   Players: ['id', 'name', 'gender', 'joined'],
   Stops: ['id', 'name', 'date', 'venue', 'total', 'created', 'time', 'level', 'format', 'host', 'courts', 'rounds', 'players', 'setup', 'closes', 'link'],
-  Matches: ['id', 'stop', 'cup', 'round', 'time', 'court', 'a1', 'a2', 'b1', 'b2', 'sa', 'sb', 'seq', 'enteredBy', 'updated', 'sets', 'subs'],
+  Matches: ['id', 'stop', 'cup', 'round', 'time', 'court', 'a1', 'a2', 'b1', 'b2', 'sa', 'sb', 'seq', 'enteredBy', 'updated', 'sets', 'subs', 'wo'],
   ScoreLog: ['time', 'name', 'matchId', 'match', 'oldScore', 'newScore'],
   Settings: ['key', 'value', 'note'],
   Rules: ['rule'],
@@ -177,6 +177,7 @@ function handle(req) {
     case 'addRound': return addRound(req);
     case 'setPlayers': return setPlayers(req);
     case 'swapPlayer': return swapPlayer(req);
+    case 'walkover': return walkover(req);
     case 'visit': return addVisit(req);
     case 'deleteEvent': return deleteEvent(req);
     case 'linkEvents': return linkEvents(req);
@@ -205,6 +206,7 @@ function saveScore(req) {
   if (!row) return { ok: false, error: 'That match no longer exists. Refresh the page.' };
   var cols = TABS.Matches, vals = sh.getRange(row, 1, 1, cols.length).getValues()[0];
   var m = {}; cols.forEach(function (c, i) { m[c] = String(vals[i]); });
+  if (m.wo === 'a' || m.wo === 'b') return { ok: false, error: 'This game is a walkover. Ask the Court Captain to undo it first.' };
   var oldScore = m.sa === '' ? '–' : m.sa + '–' + m.sb;
   var newScore = sa === '' ? '–' : sa + '–' + sb;
   if (sets) newScore += ' (' + sets + ')';
@@ -261,7 +263,7 @@ function matchRows(stopId, list, playerIds, cupIdx) {
     if (ids.filter(function (x, j) { return ids.indexOf(x) === j; }).length !== 4) throw new Error('A player can only appear once in a game.');
     var round = parseInt(m.round, 10) || 1, court = parseInt(m.court, 10) || 1;
     out.push(['m-' + now + i.toString(36) + Math.random().toString(36).slice(2, 5), stopId, cleanText(m.cup, 40) || 'Cup', String(round),
-      cleanText(m.time, 10), String(court), ids[0], ids[1], ids[2], ids[3], '', '', String(cupIdx * 1000 + round * 10 + court), '', '', '', '']);
+      cleanText(m.time, 10), String(court), ids[0], ids[1], ids[2], ids[3], '', '', String(cupIdx * 1000 + round * 10 + court), '', '', '', '', '']);
   }
   return out;
 }
@@ -439,6 +441,35 @@ function swapPlayer(req) {
   return { ok: true };
 }
 
+// A walkover: one pair didn't turn up. The pair that did wins the full score to 0 (24–0, 6–0, or 6-0 6-0), which
+// counts for the event standings; the website leaves the game out of the Tour Rankings. side '' undoes it.
+function walkover(req) {
+  var c = host(req);
+  if (c.error) return c.error;
+  var sh = sheet('Matches'), row = findRow(sh, req.matchId);
+  if (!row) return { ok: false, error: 'That game no longer exists. Refresh the page.' };
+  var cols = TABS.Matches, vals = sh.getRange(row, 1, 1, cols.length).getValues()[0];
+  var m = {}; cols.forEach(function (k, i) { m[k] = String(vals[i]); });
+  var stop = rows('Stops').filter(function (s) { return s.id === m.stop; })[0];
+  if (!stop) return { ok: false, error: 'That event no longer exists.' };
+  if (!ownsStop(c, stop)) return { ok: false, error: 'Only ' + stop.host + ' or the organiser can change this event.' };
+  var side = req.side === 'a' || req.side === 'b' ? req.side : '';
+  var sa = '', sb = '', sets = '';
+  if (side) {
+    var full = stop.format === 'full', games = full || stop.format === 'short';
+    var win = games ? 6 : (parseInt(stop.total, 10) || 21);
+    if (full) { var setup = parseSetup(stop.setup), n = setup.sets === '1' ? 1 : 2; win = 6 * n; sets = n === 1 ? '6-0' : '6-0 6-0'; }
+    if (side === 'a') { sa = 0; sb = win; if (sets) sets = sets.replace(/6-0/g, '0-6'); } else { sa = win; sb = 0; }
+  } else if (m.wo !== 'a' && m.wo !== 'b') return { ok: true, unchanged: true };
+  var now = new Date().toISOString(), old = m.sa === '' ? '–' : m.sa + '–' + m.sb;
+  sh.getRange(row, cols.indexOf('sa') + 1, 1, 2).setValues([[String(sa), String(sb)]]);
+  sh.getRange(row, cols.indexOf('enteredBy') + 1, 1, 3).setValues([[side ? c.name : '', now, sets]]);
+  sh.getRange(row, cols.indexOf('wo') + 1).setValue(side);
+  var names = playerNames(), no = side ? (side === 'a' ? [m.a1, m.a2] : [m.b1, m.b2]) : [];
+  sheet('ScoreLog').appendRow([now, c.name, m.id, side ? 'Walkover: ' + no.map(names).join('/') + " didn't show" : 'Walkover undone', old, side ? sa + '–' + sb : '–']);
+  return { ok: true };
+}
+
 // Adds the next round of a Mexicano event once the captain has made it on the website.
 function addRound(req) {
   var c = host(req);
@@ -586,7 +617,7 @@ function readAll() {
     return {
       id: m.id, stop: m.stop, cup: m.cup, round: num(m.round) || 1, time: m.time, court: num(m.court),
       a: [m.a1, m.a2], b: [m.b1, m.b2], sa: num(m.sa), sb: num(m.sb), seq: num(m.seq) || 0,
-      enteredBy: m.enteredBy, updated: m.updated, sets: m.sets, subs: m.subs ? String(m.subs).split(',') : []
+      enteredBy: m.enteredBy, updated: m.updated, sets: m.sets, subs: m.subs ? String(m.subs).split(',') : [], wo: m.wo === 'a' || m.wo === 'b' ? m.wo : ''
     };
   });
   var ruleTab = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Rules');
