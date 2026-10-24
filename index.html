@@ -197,6 +197,8 @@ details.rk-how p{margin:8px 0 0}
 .story .pair{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0 4px}
 .story figure{margin:0}
 .story figure.solo{max-width:340px;margin:8px auto 12px}
+.story figure.clip{margin:8px 0 12px}
+.story figure video{display:block;width:100%;border-radius:10px;background:#000}
 .story figure img{border-radius:10px;aspect-ratio:3/4;object-fit:cover}
 .story figcaption{font-size:13px;color:var(--muted);margin-top:4px;text-align:center}
 .story .facts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
@@ -840,7 +842,9 @@ details.rk-how p{margin:8px 0 0}
         "The rule stands: bring the trophies back to Tour Stop 3 and defend them. Everyone else, you know who you are chasing."
       ], ["img/news/stop2-couple.webp", "Omar H and Amiza standing side by side, each holding a gold challenge trophy", "One house, two trophies"]],
       ["Shout-outs", [
-        "Aidi R was the star attraction of the day. Everybody wanted a piece of him, and he gave Derek his worst result of the morning. Shazwan and Feena's 21–3 is the score to beat this season.",
+        "Aidi R was the star attraction of the day. Everybody wanted a piece of him, and he gave Derek his worst result of the morning. Shazwan and Feena's 21–3 is the score to beat this season. Now turn the sound up for Aidi's smash."
+      ], ["img/news/stop2-aidi-smash.mp4", "Video of Aidi R smashing at Tour Stop 2, with crowd applause", "Aidi R brings the house down", "img/news/stop2-aidi-smash.webp"]],
+      ["Thank you, Captain Feena", [
         "A huge shout-out to Captain Feena, who organised the whole day and picked a cracking venue. Padel Up KSU was a hit with everyone, and Feena still found time to win every game she played. Thank you as well to everyone who brought their kids along to cheer.",
         "Every result is in Game History, and the new standings are in Tour Rankings."
       ]]
@@ -881,7 +885,10 @@ details.rk-how p{margin:8px 0 0}
       n.sections.forEach(function(sec){
         body.appendChild(el("h3",{text:sec[0]}));
         sec[1].forEach(function(t){ body.appendChild(el("p",{text:t})); });
-        if (sec[2]) body.appendChild(el("figure",{cls:"solo"},[el("img",{src:sec[2][0], alt:sec[2][1], loading:"lazy"}), el("figcaption",{text:sec[2][2]})]));
+        if (sec[2] && /\.mp4$/.test(sec[2][0])){
+          var v = el("video",{src:sec[2][0], poster:sec[2][3] || "", "aria-label":sec[2][1]}); v.controls = true; v.preload = "metadata"; v.setAttribute("playsinline", "");
+          body.appendChild(el("figure",{cls:"clip"},[v, el("figcaption",{text:sec[2][2]})]));
+        } else if (sec[2]) body.appendChild(el("figure",{cls:"solo"},[el("img",{src:sec[2][0], alt:sec[2][1], loading:"lazy"}), el("figcaption",{text:sec[2][2]})]));
       });
       main.appendChild(el("article",{cls:"story"},[el("img",{src:n.hero, alt:n.heroAlt}), body, commentsBox(n.id)]));
     });
