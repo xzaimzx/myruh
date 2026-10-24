@@ -541,7 +541,8 @@ details.rk-how p{margin:8px 0 0}
   function cupTable(list, stop){
     var t = {};
     list.forEach(function(m){ m.a.concat(m.b).forEach(function(id){ t[id] = t[id] || {id:id, pts:0, w:0, g:0, won:0, all:0, fill:0, own:0}; if (!isSub(m, id)) t[id].own++; }); });
-    list.forEach(function(m){ if (!scored(m)) return;
+    // Walkover games add no points: everyone is ranked on the games they actually played.
+    list.forEach(function(m){ if (!scored(m) || m.wo) return;
       var wn = winOf(m);
       [[m.a, m.sa, m.sb, 1], [m.b, m.sb, m.sa, 0]].forEach(function(sd){ sd[0].forEach(function(id){ var x = t[id];
         if (isSub(m, id)){ x.fill++; return; }
@@ -549,7 +550,7 @@ details.rk-how p{margin:8px 0 0}
     });
     var rows = Object.keys(t).map(function(k){ return t[k]; }).filter(function(x){ return x.own > 0; });
     var gs = rows.filter(function(x){ return x.g; }).map(function(x){ return x.g; });
-    var avg = !!(stop && stop.level) && gs.length > 0 && Math.min.apply(null, gs) !== Math.max.apply(null, gs);
+    var avg = (!!(stop && stop.level) || list.some(function(m){ return m.wo; })) && gs.length > 0 && Math.min.apply(null, gs) !== Math.max.apply(null, gs);
     function av(x){ return x.g ? x.pts / x.g : -1; }
     rows.sort(avg ? function(a,b){ return av(b) - av(a) || (b.g ? b.w / b.g : 0) - (a.g ? a.w / a.g : 0) || b.pts - a.pts || nameOf(a.id).localeCompare(nameOf(b.id)); }
       : function(a,b){ return b.pts - a.pts || b.w - a.w || nameOf(a.id).localeCompare(nameOf(b.id)); });
@@ -1052,7 +1053,7 @@ details.rk-how p{margin:8px 0 0}
     var t = {}, all = [], base = dayBase(group);
     group.forEach(function(s){ stopMatches(s.id).forEach(function(m){ all.push(m); }); });
     all.forEach(function(m){ m.a.concat(m.b).forEach(function(id){ if (isSub(m, id) || !S.players[id]) return; var x = t[id] = t[id] || {id:id, g:0, w:0, d:0, sh:0, pt:0, in:{}}; x.in[m.stop] = 1; }); });
-    all.forEach(function(m){ if (!scored(m)) return;
+    all.forEach(function(m){ if (!scored(m) || m.wo) return;
       var wn = winOf(m), tot = m.sa + m.sb;
       [[m.a, m.sa, 1], [m.b, m.sb, 0]].forEach(function(sd){ sd[0].forEach(function(id){ var x = t[id]; if (!x || isSub(m, id)) return;
         x.g++; x.sh += sd[1] / tot; x.pt += sd[1] / tot * base; if (wn === sd[2]) x.w++; else if (wn === 0.5) x.d++; }); });
@@ -1249,7 +1250,7 @@ details.rk-how p{margin:8px 0 0}
   }
   function noShowRules(stop){
     var f = stop && stop.format, full = f === "full" ? ((stop.setup || {}).sets === "1" ? "6-0" : "6-0 6-0") : (f === "short" ? "6–0" : (stop && stop.total ? stop.total + "–0" : "the full score to 0"));
-    return ["If a pair doesn't come for a game, the Court Captain gives a walkover: the pair that's there wins " + full + ". It counts for the event, but not for the Tour Rankings.",
+    return ["If a pair doesn't come for a game, the Court Captain gives a walkover: the pair that's there wins " + full + ". It adds no points to anyone's event total or Tour Ranking, so the event is ranked on average points per game played.",
       "If one player is missing, the Court Captain can bring in a resting player, or anyone else, for that game only. The game counts for the fill-in's Tour Ranking, but not for their event total."];
   }
   function rulesCard(stop){
@@ -1352,13 +1353,13 @@ details.rk-how p{margin:8px 0 0}
       });
     }
     if (m.wo){
-      box.appendChild(el("p",{cls:"note", text:"Walkover: " + pairName(m[m.wo]) + " didn't come, so " + pairName(m[m.wo === "a" ? "b" : "a"]) + " won " + (m.wo === "a" ? m.sb + "–" + m.sa : m.sa + "–" + m.sb) + ". This game doesn't count for the Tour Rankings."}));
+      box.appendChild(el("p",{cls:"note", text:"Walkover: " + pairName(m[m.wo]) + " didn't come, so " + pairName(m[m.wo === "a" ? "b" : "a"]) + " won " + (m.wo === "a" ? m.sb + "–" + m.sa : m.sa + "–" + m.sb) + ". This game adds no points to the event or the Tour Rankings."}));
       box.appendChild(el("button",{cls:"btn wide", text:"Undo walkover", onclick:function(){ wo("").then(function(ok){ if (ok){ UI.ns = null; load(); } }); }}));
       box.appendChild(el("p",{cls:"note", text:"To put a fill-in in this game instead, undo the walkover first."}));
       box.appendChild(msg);
       return box;
     }
-    box.appendChild(el("p",{cls:"note", text:"Pair didn't come? The pair that's there wins this game in full. It counts for the event, not the Tour Rankings."}));
+    box.appendChild(el("p",{cls:"note", text:"Pair didn't come? The pair that's there wins this game in full. It adds no points: the event is ranked on average per game played, and the Tour Rankings ignore it."}));
     ["a","b"].forEach(function(k){ box.appendChild(el("button",{cls:"btn wide", text:pairName(m[k]) + " didn't come", onclick:function(){ wo(k).then(function(ok){ if (ok){ UI.ns = null; load(); } }); }})); });
     // Replace one player for this game only
     var ns = UI.nsr && UI.nsr.id === m.id ? UI.nsr : (UI.nsr = {id:m.id, out:"", inn:""});

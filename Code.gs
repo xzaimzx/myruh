@@ -441,8 +441,8 @@ function swapPlayer(req) {
   return { ok: true };
 }
 
-// A walkover: one pair didn't turn up. The pair that did wins the full score to 0 (24–0, 6–0, or 6-0 6-0), which
-// counts for the event standings; the website leaves the game out of the Tour Rankings. side '' undoes it.
+// A walkover: one pair didn't turn up. The pair that did is shown winning the full score to 0 (24–0, 6–0, or 6-0 6-0);
+// the website leaves the game out of every total and the Tour Rankings. side '' undoes it.
 function walkover(req) {
   var c = host(req);
   if (c.error) return c.error;
