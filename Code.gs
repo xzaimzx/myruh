@@ -6,7 +6,7 @@
  * 2. Deploy → New deployment → Web app, Execute as: Me, Who has access: Anyone.
  * 3. Copy the Web app URL (ends in /exec) into index.html.
  *
- * Tabs: Players, Stops, Matches, ScoreLog, Settings, Rules, Comments, Captains.
+ * Tabs: Players, Stops, Matches, ScoreLog, Settings, Rules, Comments, Captains, Visitors, VideoPlays.
  * Comments: delete a row in the Comments tab to remove that comment from the website.
  * Captains: one row per Court Captain with their name and their own Host PIN.
  *   Delete a row to take away that captain's access.
@@ -23,6 +23,7 @@ var TABS = {
   Rules: ['rule'],
   Comments: ['id', 'article', 'time', 'name', 'text'],
   Visitors: ['time', 'visitor', 'city', 'country', 'lat', 'lon'],
+  VideoPlays: ['time', 'video', 'visitor'],
   Captains: ['name', 'pin', 'note']
 };
 
@@ -179,6 +180,7 @@ function handle(req) {
     case 'swapPlayer': return swapPlayer(req);
     case 'walkover': return walkover(req);
     case 'visit': return addVisit(req);
+    case 'play': return addPlay(req);
     case 'deleteEvent': return deleteEvent(req);
     case 'linkEvents': return linkEvents(req);
     case 'setCourtNames': return setCourtNames(req);
@@ -329,6 +331,20 @@ function addVisit(req) {
   var num = function (x, lim) { var n = parseFloat(x); return isNaN(n) || Math.abs(n) > lim ? '' : String(Math.round(n * 100) / 100); };
   ensureTab('Visitors').appendRow([new Date().toISOString(), vid, cleanText(req.city, 40), cleanText(req.country, 40), num(req.lat, 90), num(req.lon, 180)]);
   return { ok: true };
+}
+
+// One row each time someone starts a news video (once per video per page visit).
+function addPlay(req) {
+  var vid = String(req.visitor || '').replace(/[^a-z0-9]/gi, '').slice(0, 24), video = cleanText(req.video, 120);
+  if (!vid || !/^img\/news\/[\w.-]+\.mp4$/.test(video)) return { ok: false, error: 'Bad request.' };
+  ensureTab('VideoPlays').appendRow([new Date().toISOString(), video, vid]);
+  return { ok: true };
+}
+function playStats() {
+  var out = {};
+  if (!SpreadsheetApp.getActiveSpreadsheet().getSheetByName('VideoPlays')) return out;
+  rows('VideoPlays').forEach(function (p) { out[p.video] = (out[p.video] || 0) + 1; });
+  return out;
 }
 
 // Totals for the homepage: visits, different visitors, and cities with 2 or more visitors (so nobody can be singled out).
@@ -624,7 +640,7 @@ function readAll() {
   var rules = ruleTab ? rows('Rules').map(function (r) { return r.rule; }).filter(String) : null;
   ensureTab('Comments');
   var comments = rows('Comments').map(function (c) { return { id: c.id, article: c.article, time: c.time, name: c.name, text: c.text.replace(/^'(?=[=+\-@])/, '') }; });
-  return { ok: true, players: players, stops: stops, matches: matches, rules: rules, comments: comments, visits: visitStats() };
+  return { ok: true, players: players, stops: stops, matches: matches, rules: rules, comments: comments, visits: visitStats(), plays: playStats() };
 }
 
 function rows(tab) {

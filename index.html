@@ -457,7 +457,8 @@ details.rk-how p{margin:8px 0 0}
     S.players = P; S.stops = St; S.matches = M;
     S.rules = (data.rules && data.rules.length) ? data.rules : null;
     S.comments = data.comments || null;   // null until the sheet script supports comments
-    S.visits = data.visits || null;       // null until the sheet script counts visits
+    S.visits = data.visits || null;
+    S.plays = data.plays || null;         // null until the sheet script counts video plays       // null until the sheet script counts visits
   }
   function load(quiet){
     if (!configured) return Promise.resolve();
@@ -770,6 +771,16 @@ details.rk-how p{margin:8px 0 0}
       .catch(function(){ return geo("https://ipapi.co/json/", function(d){ return {city:d.city, country:d.country_name, lat:d.latitude, lon:d.longitude}; }); })
       .then(send, function(){ send({}); });
   }
+  // Video plays: one per video per page visit, so pausing and replaying doesn't add more.
+  var played = {};
+  function countPlay(src){
+    if (!configured || played[src]) return;
+    played[src] = 1;
+    var vid = lsGet("mt-vid");
+    if (!vid){ vid = Math.random().toString(36).slice(2, 12) + Date.now().toString(36); lsSet("mt-vid", vid); }
+    post({action:"play", visitor:vid, video:src});
+    if (S.plays) S.plays[src] = (S.plays[src] || 0) + 1;
+  }
   function visitsCard(main){
     var v = S.visits; if (!v || !v.visits) return;
     var cities = v.cities || [];
@@ -887,7 +898,9 @@ details.rk-how p{margin:8px 0 0}
         sec[1].forEach(function(t){ body.appendChild(el("p",{text:t})); });
         if (sec[2] && /\.mp4$/.test(sec[2][0])){
           var v = el("video",{src:sec[2][0], poster:sec[2][3] || "", "aria-label":sec[2][1]}); v.controls = true; v.preload = "metadata"; v.setAttribute("playsinline", "");
-          body.appendChild(el("figure",{cls:"clip"},[v, el("figcaption",{text:sec[2][2]})]));
+          v.addEventListener("play", countPlay.bind(null, sec[2][0]));
+          var np = S.plays && S.plays[sec[2][0]];
+          body.appendChild(el("figure",{cls:"clip"},[v, el("figcaption",{text:sec[2][2] + (np ? " · ▶ " + np + (np === 1 ? " play" : " plays") : "")})]));
         } else if (sec[2]) body.appendChild(el("figure",{cls:"solo"},[el("img",{src:sec[2][0], alt:sec[2][1], loading:"lazy"}), el("figcaption",{text:sec[2][2]})]));
       });
       main.appendChild(el("article",{cls:"story"},[el("img",{src:n.hero, alt:n.heroAlt}), body, commentsBox(n.id)]));
