@@ -347,6 +347,9 @@ details.rk-how p{margin:8px 0 0}
   function ssGet(k){ try { return sessionStorage.getItem(k); } catch(e){ return null; } }
   function ssSet(k, v){ try { if (v === null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch(e){} }
   UI.tab = lsGet("mt-tab") || "session";
+  // A link like .../myruh/#news opens straight on that tab (session, news, tour, past, captains).
+  var hashTab = (location.hash || "").replace("#", "").toLowerCase();
+  if (["session","news","tour","past","captains"].indexOf(hashTab) >= 0){ UI.tab = hashTab; lsSet("mt-tab", hashTab); }
   if (["session","news","tour","past","captains"].indexOf(UI.tab) < 0) UI.tab = "session";
   try { var w = JSON.parse(lsGet("mt-who") || "null"); if (w && w.name) who = w; } catch(e){}
   adminPin = ssGet("mt-admin") || "";
