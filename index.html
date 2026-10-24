@@ -196,6 +196,7 @@ details.rk-how p{margin:8px 0 0}
 .story p{margin:0 0 10px;line-height:1.5}
 .story .pair{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0 4px}
 .story figure{margin:0}
+.story figure.solo{max-width:340px;margin:8px auto 12px}
 .story figure img{border-radius:10px;aspect-ratio:3/4;object-fit:cover}
 .story figcaption{font-size:13px;color:var(--muted);margin-top:4px;text-align:center}
 .story .facts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
@@ -814,6 +815,37 @@ details.rk-how p{margin:8px 0 0}
 
   // Tour News stories, newest first. Photos live in img/news/.
   var NEWS = [{
+    id: "stop2-results",
+    kicker: "Tour Stop 2 · Sat 24 Oct 2026 · Padel Up KSU",
+    title: "Omar and Amiza take both challenge trophies home",
+    hero: "img/news/stop2-group.webp", heroAlt: "The Tour Stop 2 players and their families lined up at the net at Padel Up KSU",
+    intro: ["Sixteen players, three courts, 22 games and one very busy scoreboard at Padel Up KSU. By lunchtime the challenge trophies had a new home, and it was the same home: Omar H took the Men's trophy from Redzuan (Du), and his partner Amiza became the first ever holder of the Ladies' trophy. The power couple of the MYRUH Padelers Tour is officially a thing."],
+    facts: [["22","games played"],["21–3","biggest win on court"],["17.0","per game won Mixed Mayhem"]],
+    photos: [["img/news/stop2-omar-trophy.webp","Redzuan (Du) handing the Men's challenge trophy to Omar H","Redzuan (Du) hands the Men's trophy to Omar H"],["img/news/stop2-amiza-trophy.webp","Redzuan (Du) presenting the Ladies' challenge trophy to Amiza on court","Amiza, the first holder of the Ladies' trophy"]],
+    sections: [
+      ["Mixed Mayhem: a third of a point", [
+        "Kak Yan and Azman's games are walkovers, and walkovers don't count, so the table is decided on average points per game actually played. That made it a race right to the last round.",
+        "Derek P was the early man to catch. He opened with an 18–6 win alongside Amirul I and sat on top after round 1. Omar H and Amiza answered with 17–7 and 19–5, and Shazwan AR and Feena produced the scoreline of the day, a brutal 21–3 in round 2.",
+        "After round 4 it was tight at the top. Shazwan and Feena led on 17.5 per game. Omar and Amiza had finished their games on 17.0 and could only watch. Derek was lurking on 16.5.",
+        "Then round 5 settled everything. Aidi R switched sides, teamed up with Amirul, and handed Derek and Shafiq N an 8–16 beating. Derek's challenge was over. Shazwan and Feena needed 16 points from their last game to stay on top. They won 15–9. One point short. They finished on 16.7 per game, and Omar and Amiza took the cup on 17.0.",
+        "Both pairs won every game they played. Derek finished next on 13.7."
+      ]],
+      ["Smash Showdown: Derek gets his revenge", [
+        "The eight men moved on to short matches, and Derek came out swinging again. He won his first three games, including a 6–0 bagel with Zaim Z over Qayyum Z and Shafiq N, and sat on top of the table. Then the extra round bit him. A 1–5 loss alongside Aidi let Amirul, and then Shazwan, take turns at the top.",
+        "Meanwhile Omar was having a terrible start. He lost his first two games, 2–4 and 1–5, and looked out of it. Then he flipped the switch: 4–2 with Derek, a 6–0 bagel with Shazwan, and a 4–2 with Amirul to finish. Three straight wins.",
+        "The final round decided it. Derek and Qayyum teamed up and squeezed past Aidi and Zaim 4–3 in the tightest game of the event. They finished dead level: 4 wins from 5 and 19 games each. The leaderboard puts Derek first, and he can point to the one time they met as opponents, the 6–0 in round 2."
+      ]],
+      ["The trophies", [
+        "The challenge trophies go to the best player of the whole day across both events. Omar's perfect Mixed Mayhem plus his Smash comeback gave him the best average of all the men, so he takes the Men's trophy off Redzuan (Du). It was close: Omar finished on 14.9 per game to Shazwan's 14.8, and Derek, who led both events at one point, finished third among the men. Amiza's perfect record edged out Feena for the first Ladies' trophy, by a third of a point. Omar played in both events, so he tops the All Events board too.",
+        "The rule stands: bring the trophies back to Tour Stop 3 and defend them. Everyone else, you know who you are chasing."
+      ], ["img/news/stop2-couple.webp", "Omar H and Amiza standing side by side, each holding a gold challenge trophy", "One house, two trophies"]],
+      ["Shout-outs", [
+        "Aidi R was the star attraction of the day. Everybody wanted a piece of him, and he gave Derek his worst result of the morning. Shazwan and Feena's 21–3 is the score to beat this season.",
+        "A huge shout-out to Captain Feena, who organised the whole day and picked a cracking venue. Padel Up KSU was a hit with everyone, and Feena still found time to win every game she played. Thank you as well to everyone who brought their kids along to cheer.",
+        "Every result is in Game History, and the new standings are in Tour Rankings."
+      ]]
+    ]
+  }, {
     id: "stop1-results",
     kicker: "Tour Stop 1 · Sat 17 Oct 2026 · Padel In Ar Rabwah",
     title: "Fakri and Redzuan (Du) crowned on a big opening day",
@@ -849,6 +881,7 @@ details.rk-how p{margin:8px 0 0}
       n.sections.forEach(function(sec){
         body.appendChild(el("h3",{text:sec[0]}));
         sec[1].forEach(function(t){ body.appendChild(el("p",{text:t})); });
+        if (sec[2]) body.appendChild(el("figure",{cls:"solo"},[el("img",{src:sec[2][0], alt:sec[2][1], loading:"lazy"}), el("figcaption",{text:sec[2][2]})]));
       });
       main.appendChild(el("article",{cls:"story"},[el("img",{src:n.hero, alt:n.heroAlt}), body, commentsBox(n.id)]));
     });
