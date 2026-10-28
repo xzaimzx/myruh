@@ -831,6 +831,39 @@ details.rk-how p{margin:8px 0 0}
 
   // Tour News stories, newest first. Photos live in img/news/.
   var NEWS = [{
+    id: "eagles1-results",
+    kicker: "Match Eagles #1 · Wed 28 Oct 2026 · Eagles",
+    title: "Here we go: Mahzan signs, and finishes top on debut",
+    hero: "img/news/eagles1-mahzan.webp", heroAlt: "Mahzan about to serve on the blue court at Eagles, seen through the fence at night",
+    intro: ["Six players, one court, two hours under the lights at Eagles. It was an intimate night, hosted by Lokman, and it had one headline above all the others. The MYRUH Padelers Tour has landed its marquee signing."],
+    facts: [["7","games played"],["4.0","games per match for Mahzan"],["3","debuts"]],
+    photos: [],
+    sections: [
+      ["The transfer of the season", [
+        "Like a La Liga star crossing over to the Premier League, Mahzan arrives with a reputation, a famous partnership, and a medical file everyone was nervous about. A few months ago, an injury threatened to end his padel career. On Wednesday night he passed the medical, signed on the dotted line, and walked out at Eagles with his favourite partner, Jamal, signed in the same window. Lokman completed the deal as the third new arrival.",
+        "The big question with every big-money signing is whether he can handle the pace of the new league. We got the answer in two hours."
+      ]],
+      ["A slow start, then a storm", [
+        "The night opened with the tightest game of the evening. Mahzan and Fakri G against Jamal and Zaim Z went the distance, and Jamal and Zaim edged it 4–3. A narrow loss on debut, but the touch was clearly still there.",
+        "Jamal was the man to catch early on. He won his first four games in a row, with three different partners, and looked like he'd been in the league for years.",
+        "Mahzan kept coming. A 5–1 win with Zaim. A 2–4 loss against Fakri and Jamal. Then the moment the fans paid to see: the famous partnership back together. Mahzan and Jamal rolled over Aidi R and Zaim 5–1. Some partnerships don't need a pre-season."
+      ]],
+      ["The final twist", [
+        "It all came down to the last game, and the script was perfect. Mahzan teamed up with Fakri against his favourite partner Jamal, alongside Lokman. Jamal went in top of the table. Mahzan and Fakri won 5–1, and Mahzan climbed over his old partner to finish first on 4.0 games per match. Jamal ended second on 3.8. Two debuts, first and second."
+      ]],
+      ["Class is permanent", [
+        "Fakri lost his first two games and then did what Fakri does. Three straight wins, 4–2, 5–1 and 5–1, took him to third on 3.6. Never rushed, never rattled. The new boys will have to get used to him."
+      ]],
+      ["Shout-outs", [
+        "Aidi R braved the Riyadh traffic just to be there for the unveiling, to welcome Mahzan into the padel arena, and he still won two of his four games. That's what a welcome committee looks like.",
+        "Lokman had a tough debut on the scoreboard, but he hosted the whole night, and without him there was no game at all. Thank you, Captain Lokman, and welcome to the Tour, all three of you."
+      ]],
+      ["The sour note", [
+        "The only thing in short supply was hospitality. Players found the venue staff stingy with balls and water, and more than one player was unhappy with how they were treated. Perhaps it's a new management team finding its feet. We hope Eagles is back to its welcoming best next time.",
+        "Every result is in Game History, and the new standings are in Tour Rankings."
+      ]]
+    ]
+  }, {
     id: "stop2-results",
     kicker: "Tour Stop 2 · Sat 24 Oct 2026 · Padel Up KSU",
     title: "Omar and Amiza take both challenge trophies home",
@@ -895,7 +928,7 @@ details.rk-how p{margin:8px 0 0}
       body.appendChild(facts);
       var pair = el("div",{cls:"pair"});
       n.photos.forEach(function(ph){ pair.appendChild(el("figure",{},[el("img",{src:ph[0], alt:ph[1], loading:"lazy"}), el("figcaption",{text:ph[2]})])); });
-      body.appendChild(pair);
+      if (n.photos.length) body.appendChild(pair);
       n.sections.forEach(function(sec){
         body.appendChild(el("h3",{text:sec[0]}));
         sec[1].forEach(function(t){ body.appendChild(el("p",{text:t})); });
