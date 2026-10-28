@@ -16,7 +16,7 @@
 
 var TABS = {
   Players: ['id', 'name', 'gender', 'joined'],
-  Stops: ['id', 'name', 'date', 'venue', 'total', 'created', 'time', 'level', 'format', 'host', 'courts', 'rounds', 'players', 'setup', 'closes', 'link'],
+  Stops: ['id', 'name', 'date', 'venue', 'total', 'created', 'time', 'level', 'format', 'host', 'courts', 'rounds', 'players', 'setup', 'closes', 'link', 'locked'],
   Matches: ['id', 'stop', 'cup', 'round', 'time', 'court', 'a1', 'a2', 'b1', 'b2', 'sa', 'sb', 'seq', 'enteredBy', 'updated', 'sets', 'subs', 'wo'],
   ScoreLog: ['time', 'name', 'matchId', 'match', 'oldScore', 'newScore'],
   Settings: ['key', 'value', 'note'],
@@ -179,6 +179,7 @@ function handle(req) {
     case 'setPlayers': return setPlayers(req);
     case 'swapPlayer': return swapPlayer(req);
     case 'walkover': return walkover(req);
+    case 'lockScores': return lockScores(req);
     case 'visit': return addVisit(req);
     case 'play': return addPlay(req);
     case 'deleteEvent': return deleteEvent(req);
@@ -209,6 +210,7 @@ function saveScore(req) {
   var cols = TABS.Matches, vals = sh.getRange(row, 1, 1, cols.length).getValues()[0];
   var m = {}; cols.forEach(function (c, i) { m[c] = String(vals[i]); });
   if (m.wo === 'a' || m.wo === 'b') return { ok: false, error: 'This game is a walkover. Ask the Court Captain to undo it first.' };
+  if (isLocked(m.stop)) return { ok: false, error: LOCKED };
   var oldScore = m.sa === '' ? '–' : m.sa + '–' + m.sb;
   var newScore = sa === '' ? '–' : sa + '–' + sb;
   if (sets) newScore += ' (' + sets + ')';
@@ -423,6 +425,7 @@ function swapPlayer(req) {
   var stop = rows('Stops').filter(function (s) { return s.id === String(req.stop); })[0];
   if (!row || !stop) return { ok: false, error: 'That event no longer exists.' };
   if (!ownsStop(c, stop)) return { ok: false, error: 'Only ' + stop.host + ' or the organiser can change this event.' };
+  if (stop.locked === 'yes') return { ok: false, error: LOCKED };
   var out = String(req.out || ''), swaps = req.swaps || [];
   var known = rows('Players').map(function (p) { return p.id; });
   if (!swaps.length) return { ok: false, error: 'Pick who comes in.' };
@@ -457,6 +460,23 @@ function swapPlayer(req) {
   return { ok: true };
 }
 
+// Locked events: nobody can change scores, walkovers or fill-ins until the Court Captain or the organiser unlocks them.
+var LOCKED = 'Scores for this event are locked. Ask the Court Captain to unlock them.';
+function isLocked(stopId) {
+  return rows('Stops').some(function (s) { return s.id === stopId && s.locked === 'yes'; });
+}
+function lockScores(req) {
+  var c = host(req);
+  if (c.error) return c.error;
+  var sh = sheet('Stops'), row = findRow(sh, req.stop);
+  var stop = rows('Stops').filter(function (s) { return s.id === String(req.stop); })[0];
+  if (!row || !stop) return { ok: false, error: 'That event no longer exists.' };
+  if (!ownsStop(c, stop)) return { ok: false, error: 'Only ' + stop.host + ' or the organiser can change this event.' };
+  sh.getRange(row, TABS.Stops.indexOf('locked') + 1).setValue(req.locked ? 'yes' : '');
+  sheet('ScoreLog').appendRow([new Date().toISOString(), c.name, stop.id, (req.locked ? 'Locked' : 'Unlocked') + ' scores for ' + stop.name, '–', req.locked ? 'locked' : 'unlocked']);
+  return { ok: true };
+}
+
 // A walkover: one pair didn't turn up. The pair that did is shown winning the full score to 0 (24–0, 6–0, or 6-0 6-0);
 // the website leaves the game out of every total and the Tour Rankings. side '' undoes it.
 function walkover(req) {
@@ -469,6 +489,7 @@ function walkover(req) {
   var stop = rows('Stops').filter(function (s) { return s.id === m.stop; })[0];
   if (!stop) return { ok: false, error: 'That event no longer exists.' };
   if (!ownsStop(c, stop)) return { ok: false, error: 'Only ' + stop.host + ' or the organiser can change this event.' };
+  if (stop.locked === 'yes') return { ok: false, error: LOCKED };
   var side = req.side === 'a' || req.side === 'b' ? req.side : '';
   var sa = '', sb = '', sets = '';
   if (side) {
@@ -626,7 +647,7 @@ function readAll() {
   var stops = rows('Stops').map(function (s) {
     return {
       id: s.id, name: s.name, date: s.date, venue: s.venue, total: num(s.total), created: s.created, time: s.time,
-      level: s.level, format: s.format, host: s.host, courts: num(s.courts), rounds: num(s.rounds), players: s.players ? s.players.split(',') : [], setup: parseSetup(s.setup), closes: s.closes || '', link: s.link || ''
+      level: s.level, format: s.format, host: s.host, courts: num(s.courts), rounds: num(s.rounds), players: s.players ? s.players.split(',') : [], setup: parseSetup(s.setup), closes: s.closes || '', link: s.link || '', locked: s.locked === 'yes'
     };
   });
   var matches = rows('Matches').map(function (m) {

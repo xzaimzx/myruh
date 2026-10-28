@@ -1072,6 +1072,7 @@ details.rk-how p{margin:8px 0 0}
     }
     if (sec === "rules"){ main.appendChild(rulesCard(stop)); return; }
     if (tip) main.appendChild(tip);
+    if (stop.locked) main.appendChild(el("p",{cls:"note", text:"🔒 Scores are locked. They can't be changed any more."}));
     cups.forEach(function(c){
       var list = byCup[c];
       main.appendChild(el("div",{cls:"cup"},[el("h3",{text:c}), el("span",{text: list.filter(scored).length + "/" + list.length + " scored"})]));
@@ -1087,7 +1088,8 @@ details.rk-how p{margin:8px 0 0}
     });
     if (stop.format === "mexicano" && ms.length && canManage(stop)) main.appendChild(nextRoundCard(stop, ms));
     if (stop.level && stop.format !== "mexicano" && ms.length && canManage(stop) && !isDone(stop)) extraRoundCard(main, stop, ms);
-    if (ms.length && canManage(stop) && ms.some(function(m){ return !scored(m); })) main.appendChild(swapCard(stop, ms));
+    if (ms.length && !stop.locked && canManage(stop) && ms.some(function(m){ return !scored(m); })) main.appendChild(swapCard(stop, ms));
+    if (ms.length && canManage(stop)) main.appendChild(lockCard(stop));
     if (isAdmin()) main.appendChild(addMatchForm(stop, cups, ms));
     if (ms.length){
       var shs = el("button",{cls:"btn ghost wide", text:"Share " + stop.name + " schedule", onclick:function(){ openShare(scheduleText(stop, cups, byCup)); }});
@@ -1376,7 +1378,7 @@ details.rk-how p{margin:8px 0 0}
       var row = el("div",{cls:"side" + (fin && ((key==="sa" && wn === 1) || (key==="sb" && wn === 0)) ? " won" : "")},[el("div",{cls:"who", text:pairName(ids)})]);
       var inp = el("input",{cls:"sc", type:"text", inputmode:"numeric", pattern:"[0-9]*", maxlength:"3", autocomplete:"off", placeholder:"–", "aria-label":"Score for " + pairName(ids)});
       inp.value = (typeof val === "number") ? String(val) : "";
-      if (m.wo) inp.disabled = true;
+      if (m.wo || stop.locked) inp.disabled = true;
       row.appendChild(inp); return {row:row, inp:inp};
     }
     var A = side(m.a, m.sa, "sa"), B = side(m.b, m.sb, "sb");
@@ -1412,7 +1414,7 @@ details.rk-how p{margin:8px 0 0}
     var st = status[m.id];
     var byText = st ? st.text : (m.wo ? "Walkover: " + pairName(m[m.wo]) + " didn't come" : (m.enteredBy && fin ? "Entered by " + m.enteredBy : ""));
     foot.appendChild(el("span",{cls:"by" + (st && st.err ? " err" : ""), text: byText}));
-    var cap = stop && canManage(stop) && (!fin || m.wo);
+    var cap = stop && !stop.locked && canManage(stop) && (!fin || m.wo);
     if (cap) foot.appendChild(el("button",{cls:"del", text: UI.ns === m.id ? "Close" : "No-show?", "aria-expanded": UI.ns === m.id ? "true" : "false", onclick:function(){ UI.ns = UI.ns === m.id ? null : m.id; render(); }}));
     if (isAdmin()){
       var armed = false;
@@ -1491,7 +1493,7 @@ details.rk-how p{margin:8px 0 0}
     [["a",1],["b",0]].forEach(function(o){ sides.appendChild(el("div",{cls:"side" + (fin && wn === o[1] ? " won" : "")},[el("div",{cls:"who", text:pairName(m[o[0]])})])); });
     var inp = el("input",{cls:"sets", type:"text", autocomplete:"off", placeholder:"Sets, e.g. 6-4 3-6 7-5", "aria-label":"Sets for " + pairName(m.a) + " against " + pairName(m.b)});
     inp.value = m.sets || (fin ? m.sa + "-" + m.sb : "");
-    if (m.wo) inp.disabled = true;
+    if (m.wo || stop.locked) inp.disabled = true;
     var hint = el("div",{cls:"sethint", text:"First number is " + pairName(m.a) + "."});
     sides.appendChild(inp); sides.appendChild(hint);
     card.appendChild(sides);
@@ -1994,6 +1996,21 @@ details.rk-how p{margin:8px 0 0}
       if (out.set.rotate) out.lines.push("Rotate partners keeps the couples together and lets you split men and ladies halfway, like Social.");
     }
     return out;
+  }
+  // Court Captains lock an event's scores after the last game, so nobody can change them with the Score PIN.
+  function lockCard(stop){
+    var card = el("div",{cls:"card"},[el("h3",{text: stop.locked ? "🔒 Scores locked" : "Lock scores"}),
+      el("p",{cls:"note", text: stop.locked ? "Nobody can change this event's scores. Unlock them if a score needs fixing." : "When the last game is done, lock the scores so nobody can change them, even with the Score PIN. You can unlock them again."})]);
+    var msg = el("div",{cls:"msg"});
+    var btn = el("button",{cls:"btn " + (stop.locked ? "ghost" : "primary") + " wide", text: stop.locked ? "Unlock scores" : "Lock scores", onclick:function(){
+      btn.disabled = true; btn.textContent = "Saving…";
+      hostPost({action:"lockScores", stop:stop.id, locked:!stop.locked}).then(function(res){
+        if (res.ok){ stop.locked = !stop.locked; render(); load(true); }
+        else { btn.disabled = false; btn.textContent = stop.locked ? "Unlock scores" : "Lock scores"; msg.textContent = res.error || "Couldn't reach the Google Sheet. Try again."; }
+      });
+    }});
+    card.appendChild(btn); card.appendChild(msg);
+    return card;
   }
   function isSub(m, id){ return !!(m.subs && m.subs.indexOf(id) >= 0); }
   // Swap an injured or tired player out of their unscored games. A resting player fills each one; nothing else changes.
