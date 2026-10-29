@@ -1557,10 +1557,12 @@ details.rk-how p{margin:8px 0 0}
     // What's been typed or picked survives the 20-second refresh
     var lastRound = ms.length ? Math.max.apply(null, ms.map(function(m){ return m.round || 1; })) : 1;
     UI.am = UI.am || {};
-    var am = UI.am[stop.id] || (UI.am[stop.id] = {cup: cups.length ? cups[cups.length-1] : "", round:String(lastRound), court:"1", time:"", ids:["","","",""]});
-    var cupIn = el("input",{type:"text", value:am.cup, placeholder:"e.g. Mixed Mayhem Cup", list:"cupList"});
-    cupIn.addEventListener("input", function(){ am.cup = cupIn.value; });
-    var dl = el("datalist",{id:"cupList"}); cups.forEach(function(c){ dl.appendChild(el("option",{value:c})); });
+    // A new match always joins one of the event's cups, so it can't start a cup of its own by accident
+    var defCup = cups.length ? cups[cups.length-1] : (stop.level && stop.format ? fmtLabel(stop.level, stop.format) : "Cup");
+    var am = UI.am[stop.id] || (UI.am[stop.id] = {cup:defCup, round:String(lastRound), court:"1", time:"", ids:["","","",""]});
+    if (cups.length && cups.indexOf(am.cup) < 0) am.cup = defCup;
+    var cupIn = el("select"); (cups.length ? cups : [defCup]).forEach(function(c){ cupIn.appendChild(el("option",{value:c, text:c, selected: am.cup === c ? "selected" : null})); });
+    cupIn.addEventListener("change", function(){ am.cup = cupIn.value; });
     var rIn = el("input",{type:"text", inputmode:"numeric", value:am.round});
     rIn.addEventListener("input", function(){ am.round = rIn.value; });
     var cIn = el("select"); ["1","2","3","4"].forEach(function(c){ cIn.appendChild(el("option",{value:c, text:courtName(stop, +c), selected: am.court === c ? "selected" : null})); });
@@ -1569,7 +1571,7 @@ details.rk-how p{margin:8px 0 0}
     tIn.addEventListener("input", function(){ am.time = tIn.value; });
     var sels = [0,1,2,3].map(function(i){ var s = el("select"); playerOptions(s, i < 2 ? "Team 1 player" : "Team 2 player"); s.value = am.ids[i]; s.addEventListener("change", function(){ am.ids[i] = s.value; }); s.style.marginBottom = "6px"; return s; });
     var msg = el("div",{cls:"msg", text:am.msg || ""});
-    card.appendChild(el("div",{cls:"field"},[el("label",{text:"Cup"}), cupIn, dl]));
+    if (cups.length > 1) card.appendChild(el("div",{cls:"field"},[el("label",{text:"Cup"}), cupIn]));
     card.appendChild(el("div",{cls:"grid3"},[el("div",{cls:"field"},[el("label",{text:"Round"}), rIn]), el("div",{cls:"field"},[el("label",{text:"Court"}), cIn]), el("div",{cls:"field"},[el("label",{text:"Time"}), tIn])]));
     card.appendChild(el("div",{cls:"field"},[el("label",{text:"Team 1"}), sels[0], sels[1]]));
     card.appendChild(el("div",{cls:"field"},[el("label",{text:"Team 2"}), sels[2], sels[3]]));
@@ -1578,7 +1580,7 @@ details.rk-how p{margin:8px 0 0}
       var ids = sels.map(function(s){ return s.value; });
       if (ids.some(function(v){ return !v; })) { msg.textContent = "Pick all four players."; return; }
       if (new Set(ids).size !== 4) { msg.textContent = "Each player can only appear once in a match."; return; }
-      var cup = cupIn.value.trim() || "Cup";
+      var cup = cupIn.value || defCup;
       var cupIdx = cups.indexOf(cup); if (cupIdx < 0) cupIdx = cups.length;
       msg.textContent = ""; btn.disabled = true; btn.textContent = "Adding…";
       adminPost({action:"addMatch", stop:stop.id, cup:cup, cupIdx:cupIdx, round:rIn.value, court:cIn.value, time:tIn.value, a1:ids[0], a2:ids[1], b1:ids[2], b2:ids[3]}).then(function(res){
