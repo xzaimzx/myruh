@@ -1612,7 +1612,7 @@ details.rk-how p{margin:8px 0 0}
     if (+mk.mins > 0) return +mk.mins;
     if (mk.format === "short") return 18;
     if (mk.format === "full") return mk.sets === "1" ? 40 : 90;
-    return mk.total >= 32 ? 20 : (mk.total >= 24 ? 17 : 15);
+    return mk.total >= 32 ? 18 : (mk.total >= 24 ? 14 : 13);
   }
   // Most games for everyone, all equal, in the time slots that fit: full rounds, plus an extra match for whoever
   // has played least when the numbers don't divide evenly. Empty spots in that match go to volunteers.
@@ -2235,9 +2235,9 @@ details.rk-how p{margin:8px 0 0}
   // How long the website allows for each round, so captains can see how the rounds fit their booking.
   function roundTimesCard(){
     var rows = [
-      ["Americano or Mexicano, 21 points", 15, "about 12 minutes of play"],
-      ["Americano or Mexicano, 24 points", 17, "about 14 minutes of play"],
-      ["Americano or Mexicano, 32 points", 20, "about 17 minutes of play"],
+      ["Americano or Mexicano, 21 points", 13, "about 11 minutes of play"],
+      ["Americano or Mexicano, 24 points", 14, "about 12 minutes of play"],
+      ["Americano or Mexicano, 32 points", 18, "about 16 minutes of play"],
       ["Match: short (6 games in total)", 18, "tiebreak at 3–3"],
       ["Match: 1 full set", 40, "first to 6 games, tiebreak at 6–6"],
       ["Match: best of 3 sets", 90, "same as Playtomic's 90 minutes"]
@@ -2248,7 +2248,7 @@ details.rk-how p{margin:8px 0 0}
     var det = el("details",{cls:"card how", open: UI.rtOpen ? "open" : null},[el("summary",{text:"How long a round takes"}),
       el("p",{cls:"note", text:"The website uses these times to work out how many rounds fit in your court booking. Each time includes a couple of minutes to change courts. Court Captains can pick their own minutes per match when they make the schedule."}),
       el("table",{cls:"standings rtimes"},[el("thead",null,[el("tr",null,[el("th",{text:"Game"}), el("th",{text:"Per round"})])]), tb]),
-      el("p",{cls:"note", text:"Example: courts booked 8:00 to 10:00am (120 minutes) with Americano to 21 points gives 120 ÷ 15 = 8 rounds. If Court 2 is only booked until 9:30am, it hosts 6 of those rounds, and in the last 2 rounds only Court 1 plays while the others rest."})])
+      el("p",{cls:"note", text:"Example: courts booked 8:00 to 10:00am (120 minutes) with Americano to 21 points gives 120 ÷ 13 = 9 rounds. If Court 2 is only booked until 9:30am, it hosts 6 of those rounds, and in the last 3 rounds only Court 1 plays while the others rest."})])
     det.addEventListener("toggle", function(){ UI.rtOpen = det.open; });
     return det;
   }
