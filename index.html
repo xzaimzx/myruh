@@ -2406,11 +2406,6 @@ details.rk-how p{margin:8px 0 0}
     tt.addEventListener("change", function(){ mk.total = +tt.value; changed(); commit(); });
     card.appendChild(field("Points per game", tt));
   }
-  var dm = roundMins({format:mk.format, total:mk.total, sets:mk.sets}), ms = el("select");
-  ms.appendChild(el("option",{value:"0", text:"Usual: " + dm + " minutes", selected: +mk.mins > 0 ? null : "selected"}));
-  [10,12,13,14,15,16,17,18,20,22,24,25,30,35,40,45,60,90].forEach(function(n){ if (n !== dm) ms.appendChild(el("option",{value:String(n), text:n + " minutes", selected: +mk.mins === n ? "selected" : null})); });
-  ms.addEventListener("change", function(){ mk.mins = +ms.value; changed(); commit(); });
-  card.appendChild(field("Minutes per match", ms, "Including changing courts. Shorter matches fit more rounds into your booking."));
   }
   // With no stop: the create form (where, when, level). With a stop: its players and schedule, which can be changed until the games are scored.
   function createCard(stop){
