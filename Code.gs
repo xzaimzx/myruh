@@ -263,8 +263,10 @@ function matchRows(stopId, list, playerIds, cupIdx) {
   var out = [], now = Date.now().toString(36);
   for (var i = 0; i < list.length; i++) {
     var m = list[i], ids = [m.a1, m.a2, m.b1, m.b2].map(String);
-    if (ids.some(function (x) { return playerIds.indexOf(x) < 0; })) throw new Error('Every player in a game must be on the event list.');
-    if (ids.filter(function (x, j) { return ids.indexOf(x) === j; }).length !== 4) throw new Error('A player can only appear once in a game.');
+    // 'vol' is an empty spot in an extra match, filled later by a volunteer
+    if (ids.some(function (x) { return x !== 'vol' && playerIds.indexOf(x) < 0; })) throw new Error('Every player in a game must be on the event list.');
+    if (ids.filter(function (x, j) { return x === 'vol' || ids.indexOf(x) === j; }).length !== 4) throw new Error('A player can only appear once in a game.');
+    if (ids.every(function (x) { return x === 'vol'; })) throw new Error('A game needs at least one player.');
     var round = parseInt(m.round, 10) || 1, court = parseInt(m.court, 10) || 1;
     out.push(['m-' + now + i.toString(36) + Math.random().toString(36).slice(2, 5), stopId, cleanText(m.cup, 40) || 'Cup', String(round),
       cleanText(m.time, 10), String(court), ids[0], ids[1], ids[2], ids[3], '', '', String(cupIdx * 1000 + round * 10 + court), '', '', '', '', '']);
@@ -313,17 +315,19 @@ function setupText(setup, players) {
   var sets = setup.sets === '1' || setup.sets === '3' ? setup.sets : '';
   var names = (setup.courtNames || []).slice(0, 4).map(function (n) { return cleanText(n, 12); });
   if (!names.some(String)) names = [];
-  if (!setup.split && !setup.mixed && !setup.rotate && !fixed.length && !times.length && !sets && !setup.tbd && !names.length) return '';
+  var mins = parseInt(setup.mins, 10); if (!(mins >= 5 && mins <= 120)) mins = 0;
+  if (!setup.split && !setup.mixed && !setup.rotate && !fixed.length && !times.length && !sets && !setup.tbd && !names.length && !mins) return '';
   var o = { split: !!setup.split, mixed: !setup.split && !!setup.mixed, rotate: !!setup.rotate, fixed: fixed };
   if (times.length) o.courtTimes = times;
   if (sets) o.sets = sets;
   if (setup.tbd) o.tbd = true;   // format to be picked once sign-ups close
   if (names.length) o.courtNames = names;   // the courts' real numbers or names at the venue
+  if (mins) o.mins = mins;   // minutes per match the captain picked
   return JSON.stringify(o);
 }
 
 function parseSetup(text) {
-  try { var o = JSON.parse(text); return { split: !!o.split, mixed: !!o.mixed, rotate: !!o.rotate, fixed: o.fixed || [], courtTimes: o.courtTimes || null, sets: o.sets || '', tbd: !!o.tbd, courtNames: o.courtNames || [] }; } catch (e) { return { split: false, fixed: [] }; }
+  try { var o = JSON.parse(text); return { split: !!o.split, mixed: !!o.mixed, rotate: !!o.rotate, fixed: o.fixed || [], courtTimes: o.courtTimes || null, sets: o.sets || '', tbd: !!o.tbd, courtNames: o.courtNames || [], mins: o.mins || 0 }; } catch (e) { return { split: false, fixed: [] }; }
 }
 
 // One row per visit: a random id for the browser (not a person), and the rough city from the visitor's connection. No IP addresses are stored.

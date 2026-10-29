@@ -110,6 +110,8 @@ nav.tabs .menu button{border:0;border-radius:10px;text-align:left;padding:11px 1
 .mfoot{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid var(--line);padding:0 0 0 10px;min-height:30px}
 .mfoot .by{font-size:12.5px;color:var(--muted)}
 .mfoot .by.err{color:var(--red)}
+.rtimes tr.on td{font-weight:700}
+.rtimes tr.on b::before{content:"✓ "}
 .noshow{grid-column:1/-1;display:grid;gap:8px;padding:10px;border-top:1px solid var(--line)}
 .noshow .note{margin:0}
 .noshow select{width:100%}
@@ -370,7 +372,7 @@ details.rk-how p{margin:8px 0 0}
     (kids || []).forEach(function(c){ if (c) e.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
     return e;
   }
-  function nameOf(id){ var p = S.players[id]; return p ? p.name : "?"; }
+  function nameOf(id){ if (id === "vol") return "🙋 Volunteer"; var p = S.players[id]; return p ? p.name : "?"; }
   function pairName(ids){ return ids.map(nameOf).join(" / "); }
   function scored(m){ return typeof m.sa === "number" && typeof m.sb === "number" && (m.sa + m.sb) > 0; }
   function fmtDate(d){ if (!d) return ""; var x = new Date(d + "T00:00:00"); if (isNaN(x)) return d; return x.toLocaleDateString(undefined,{weekday:"short", day:"numeric", month:"short"}); }
@@ -555,7 +557,7 @@ details.rk-how p{margin:8px 0 0}
         if (isSub(m, id)){ x.fill++; return; }
         x.pts += sd[1]; x.g++; x.won += sd[1]; x.all += sd[1] + sd[2]; if (wn === sd[3]) x.w++; }); });
     });
-    var rows = Object.keys(t).map(function(k){ return t[k]; }).filter(function(x){ return x.own > 0; });
+    var rows = Object.keys(t).map(function(k){ return t[k]; }).filter(function(x){ return x.own > 0 && S.players[x.id]; });
     var gs = rows.filter(function(x){ return x.g; }).map(function(x){ return x.g; });
     var avg = (!!(stop && stop.level) || list.some(function(m){ return m.wo; })) && gs.length > 0 && Math.min.apply(null, gs) !== Math.max.apply(null, gs);
     function av(x){ return x.g ? x.pts / x.g : -1; }
@@ -1063,7 +1065,7 @@ details.rk-how p{margin:8px 0 0}
       var lu = el("div",{cls:"card"},[el("h3",{text:"Players at this event"})]);
       cups.forEach(function(c){
         var ids = {}; (cups.length === 1 ? stop.players || [] : []).forEach(function(id){ if (S.players[id]) ids[id] = 1; });
-        byCup[c].forEach(function(m){ m.a.concat(m.b).forEach(function(id){ ids[id] = 1; }); });
+        byCup[c].forEach(function(m){ m.a.concat(m.b).forEach(function(id){ if (S.players[id]) ids[id] = 1; }); });
         var names = Object.keys(ids).map(nameOf).sort(function(x,y){ return x.localeCompare(y); });
         lu.appendChild(el("div",{cls:"lineup"},[el("b",{text:c + " (" + names.length + ")"}), el("div",{text:names.join(", ")})]));
       });
@@ -1227,7 +1229,7 @@ details.rk-how p{margin:8px 0 0}
     order.forEach(function(c){
       var cnt = {};
       if (order.length === 1) (players || []).forEach(function(id){ if (S.players[id]) cnt[id] = 0; });
-      byCup[c].forEach(function(g){ g.a.concat(g.b).forEach(function(id){ cnt[id] = (cnt[id] || 0) + 1; }); });
+      byCup[c].forEach(function(g){ g.a.concat(g.b).forEach(function(id){ if (S.players[id]) cnt[id] = (cnt[id] || 0) + 1; }); });
       var ids = Object.keys(cnt), max = Math.max.apply(null, ids.map(function(id){ return cnt[id]; }));
       var short = ids.filter(function(id){ return cnt[id] < max; }).sort(function(a, b){ return nameOf(a).localeCompare(nameOf(b)); });
       if (!short.length) return;
@@ -1268,7 +1270,7 @@ details.rk-how p{margin:8px 0 0}
   function resting(list, round, players){
     var inCup = {}, inRound = {};
     (players || []).forEach(function(id){ if (S.players[id]) inCup[id] = 1; });
-    list.forEach(function(m){ m.a.concat(m.b).forEach(function(id){ inCup[id] = 1; if (m.round === round) inRound[id] = 1; }); });
+    list.forEach(function(m){ m.a.concat(m.b).forEach(function(id){ if (S.players[id]) inCup[id] = 1; if (m.round === round) inRound[id] = 1; }); });
     return Object.keys(inCup).filter(function(id){ return !inRound[id]; }).sort(function(a,b){ return nameOf(a).localeCompare(nameOf(b)); });
   }
 
@@ -1415,7 +1417,7 @@ details.rk-how p{margin:8px 0 0}
     var byText = st ? st.text : (m.wo ? "Walkover: " + pairName(m[m.wo]) + " didn't come" : (m.enteredBy && fin ? "Entered by " + m.enteredBy : ""));
     foot.appendChild(el("span",{cls:"by" + (st && st.err ? " err" : ""), text: byText}));
     var cap = stop && !stop.locked && canManage(stop) && (!fin || m.wo);
-    if (cap) foot.appendChild(el("button",{cls:"del", text: UI.ns === m.id ? "Close" : "No-show?", "aria-expanded": UI.ns === m.id ? "true" : "false", onclick:function(){ UI.ns = UI.ns === m.id ? null : m.id; render(); }}));
+    if (cap) foot.appendChild(el("button",{cls:"del", text: UI.ns === m.id ? "Close" : (hasVol(m) ? "Add volunteer" : "No-show?"), "aria-expanded": UI.ns === m.id ? "true" : "false", onclick:function(){ UI.ns = UI.ns === m.id ? null : m.id; render(); }}));
     if (isAdmin()){
       var armed = false;
       var del = el("button",{cls:"del", text:"Delete match", onclick:function(){
@@ -1432,9 +1434,10 @@ details.rk-how p{margin:8px 0 0}
     if (cap && UI.ns === m.id) card.appendChild(noShowPanel(m, stop));
     return card;
   }
+  function hasVol(m){ return m.a.concat(m.b).indexOf("vol") >= 0; }
   // For captains, one game at a time: a walkover when a pair didn't come, or a fill-in for one player.
   function noShowPanel(m, stop){
-    var box = el("div",{cls:"noshow"}), msg = el("div",{cls:"msg"});
+    var box = el("div",{cls:"noshow"}), msg = el("div",{cls:"msg"}), vol = hasVol(m);
     function busy(b, t){ box.querySelectorAll("button,select").forEach(function(x){ x.disabled = b; }); if (t) msg.textContent = t; }
     function wo(side){
       busy(true, "Saving…");
@@ -1450,14 +1453,17 @@ details.rk-how p{margin:8px 0 0}
       box.appendChild(msg);
       return box;
     }
+    var ns = UI.nsr && UI.nsr.id === m.id ? UI.nsr : (UI.nsr = {id:m.id, out: vol ? "vol" : "", inn:""});
+    if (vol) box.appendChild(el("p",{cls:"note", text:"This extra match evens up playing time. Pick who volunteers for each empty spot. A volunteer's game counts for their Tour Ranking, not their event total."}));
+    else {
     box.appendChild(el("p",{cls:"note", text:"Pair didn't come? The pair that's there wins this game in full. It adds no points: the event is ranked on average per game played, and the Tour Rankings ignore it."}));
     ["a","b"].forEach(function(k){ box.appendChild(el("button",{cls:"btn wide", text:pairName(m[k]) + " didn't come", onclick:function(){ wo(k).then(function(ok){ if (ok){ UI.ns = null; load(); } }); }})); });
     // Replace one player for this game only
-    var ns = UI.nsr && UI.nsr.id === m.id ? UI.nsr : (UI.nsr = {id:m.id, out:"", inn:""});
     box.appendChild(el("p",{cls:"note", text:"Or replace one player for this game only. The game counts for the fill-in's Tour Ranking, not their event total."}));
+    }
     var four = m.a.concat(m.b), ms = stopMatches(stop.id);
     var outSel = el("select",{"aria-label":"Who's missing"}); outSel.appendChild(el("option",{value:"", text:"Who's missing?"}));
-    four.forEach(function(id){ outSel.appendChild(el("option",{value:id, text:nameOf(id), selected: ns.out === id ? "selected" : null})); });
+    four.filter(function(id, i){ return four.indexOf(id) === i; }).forEach(function(id){ outSel.appendChild(el("option",{value:id, text:nameOf(id), selected: ns.out === id ? "selected" : null})); });
     outSel.addEventListener("change", function(){ ns.out = outSel.value; });
     var playing = {}; ms.forEach(function(x){ if (x.round === m.round) x.a.concat(x.b).forEach(function(id){ playing[id] = 1; }); });
     var inEvent = {}; (stop.players || []).forEach(function(id){ inEvent[id] = 1; }); ms.forEach(function(x){ x.a.concat(x.b).forEach(function(id){ inEvent[id] = 1; }); });
@@ -1469,8 +1475,9 @@ details.rk-how p{margin:8px 0 0}
     var g2 = el("optgroup",{label:"Anyone else"}); others.forEach(function(id){ g2.appendChild(el("option",{value:id, text:nameOf(id), selected: ns.inn === id ? "selected" : null})); });
     if (rest.length) inSel.appendChild(g1); if (others.length) inSel.appendChild(g2);
     inSel.addEventListener("change", function(){ ns.inn = inSel.value; });
-    box.appendChild(el("div",{cls:"field"},[outSel])); box.appendChild(el("div",{cls:"field"},[inSel]));
-    box.appendChild(el("button",{cls:"btn primary wide", text:"Replace for this game", onclick:function(){
+    if (!vol) box.appendChild(el("div",{cls:"field"},[outSel]));
+    box.appendChild(el("div",{cls:"field"},[inSel]));
+    box.appendChild(el("button",{cls:"btn primary wide", text: vol ? "Add volunteer" : "Replace for this game", onclick:function(){
       if (!ns.out || !ns.inn){ msg.textContent = "Pick who's missing and who comes in."; return; }
       busy(true, "Saving…");
       hostPost({action:"swapPlayer", stop:stop.id, out:ns.out, swaps:[{id:m.id, "in":ns.inn}], leave:false}).then(function(res){
@@ -1602,9 +1609,64 @@ details.rk-how p{margin:8px 0 0}
   function pkey(a, b){ return a < b ? a + "|" + b : b + "|" + a; }
   // Rough minutes per round, including the changeover. Used to work out how many rounds fit in the court booking.
   function roundMins(mk){
-    if (mk.format === "short") return 25;
+    if (+mk.mins > 0) return +mk.mins;
+    if (mk.format === "short") return 18;
     if (mk.format === "full") return mk.sets === "1" ? 40 : 90;
     return mk.total >= 32 ? 20 : (mk.total >= 24 ? 17 : 15);
+  }
+  // Most games for everyone, all equal, in the time slots that fit: full rounds, plus an extra match for whoever
+  // has played least when the numbers don't divide evenly. Empty spots in that match go to volunteers.
+  // Picked by: the most games each, then the fewest volunteer spots. Only if nothing can be equal, the fullest uneven plan.
+  function evenPlan(n, courts, slots){
+    var per = Math.min(courts, Math.floor(n / 4)), best = null, uneven = null;
+    if (per < 1 || slots < 1) return null;
+    for (var k = slots; k >= 1; k--){
+      var tot = 4 * per * k, lo = Math.floor(tot / n), hi = tot % n, short = hi ? n - hi : 0, em = Math.ceil(short / 4), es = Math.ceil(em / per);
+      if (!hi){ if (!best || lo > best.games) best = {rounds:k, extra:0, slots:k, games:lo, more:0, vols:0}; continue; }
+      if (!uneven) uneven = {rounds:k, extra:0, slots:k, games:lo, more:hi, vols:0};
+      if (k + es > slots) continue;
+      var p = {rounds:k, extra:em, slots:k + es, games:lo + 1, more:0, vols:em * 4 - short};
+      if (!best || p.games > best.games || (p.games === best.games && p.vols < best.vols)) best = p;
+    }
+    return best || uneven;
+  }
+  // Adds the extra matches to a schedule: players with the fewest games fill them, and "vol" marks a spot for a volunteer.
+  function evenUp(list, players, courts){
+    var cnt = {}; players.forEach(function(id){ cnt[id] = 0; });
+    list.forEach(function(m){ m.a.concat(m.b).forEach(function(id){ if (cnt[id] !== undefined) cnt[id]++; }); });
+    var max = Math.max.apply(null, players.map(function(id){ return cnt[id]; }));
+    var short = shuffle(players.filter(function(id){ return cnt[id] < max; })).sort(function(a, b){ return cnt[a] - cnt[b]; });
+    var per = Math.max(1, Math.min(courts, Math.floor(players.length / 4))), r0 = maxRound(list), cup = list[0] ? list[0].cup : "Cup", vols = 0;
+    for (var i = 0; i * 4 < short.length; i++){
+      var q = short.slice(i * 4, i * 4 + 4); while (q.length < 4){ q.push("vol"); vols++; }
+      list.push({round:r0 + 1 + Math.floor(i / per), court:(i % per) + 1, cup:cup, a:[q[0], q[1]], b:[q[2], q[3]]});
+    }
+    return vols;
+  }
+  // A guide for captains: how many games everyone gets at each match length, in the court time booked.
+  function evenGuide(mk, n, pick){
+    if (usePlan(mk) || n < 4 || !mk.start || !mk.end) return null;
+    var B = toMins(mk.end) - toMins(mk.start); if (B <= 0) B += 24 * 60;
+    var seen = {}, rows = [];
+    for (var m = 10; m <= 45; m++){
+      var ep = evenPlan(n, mk.courts || 1, Math.floor(B / m)); if (!ep) continue;
+      var key = ep.games + "|" + ep.more + "|" + ep.rounds + "|" + ep.extra;
+      if (seen[key]) { seen[key].m = m; seen[key].spare = B - ep.slots * m; continue; }
+      rows.push(seen[key] = {m:m, ep:ep, spare:B - ep.slots * m});
+    }
+    // Keep the best few: most games first, and for each number of games the longest matches
+    var byG = {}; rows.forEach(function(x){ var g = x.ep.games + "|" + x.ep.more; if (!byG[g] || x.m > byG[g].m) byG[g] = x; });
+    var list = Object.keys(byG).map(function(g){ return byG[g]; }).sort(function(a, b){ return b.ep.games - a.ep.games || b.ep.more - a.ep.more; }).slice(0, 6);
+    if (!list.length) return null;
+    var cp = evenPlan(n, mk.courts || 1, Math.floor(B / roundMins(mk))), tb = el("tbody");
+    list.forEach(function(x){
+      var ep = x.ep, on = !!cp && cp.games === ep.games && cp.more === ep.more && cp.rounds === ep.rounds && cp.extra === ep.extra;
+      var how = ep.rounds + " rounds" + (ep.extra ? " + " + ep.extra + " extra " + (ep.extra === 1 ? "match" : "matches") + (ep.vols ? " (" + ep.vols + (ep.vols === 1 ? " spot" : " spots") + " for volunteers)" : "") : "") + (x.spare >= 5 ? ", " + x.spare + " min spare" : "");
+      tb.appendChild(el("tr",{cls: on ? "on" : null, style:"cursor:pointer", onclick:function(){ pick(x.m); }},[el("td",null,[el("b",{text: ep.more ? ep.more + " play " + (ep.games + 1) + ", " + (n - ep.more) + " play " + ep.games : "Everyone plays " + ep.games}), el("div",{cls:"sub", text:how})]), el("td",{text:"up to " + x.m + " min"})]));
+    });
+    return el("div",{cls:"warn"},[el("p",null,[el("b",{text:"Guide: " + n + " players, " + (mk.courts || 1) + (mk.courts === 1 ? " court, " : " courts, ") + B + " minutes"})]),
+      el("p",{cls:"note", text:"Everyone plays the same number of games, as many as fit. When the numbers don't divide evenly, the website adds an extra match for whoever has played least, and any empty spots are for volunteers. Tap a row to use that match length."}),
+      el("table",{cls:"standings rtimes"},[el("thead",null,[el("tr",null,[el("th",{text:"Games"}), el("th",{text:"Each match"})])]), tb])]);
   }
   function toMins(hhmm){ var p = /^(\d{1,2}):(\d{2})/.exec(hhmm || ""); return p ? (+p[1]) * 60 + (+p[2]) : null; }
   // Each court's booking as [start, end]. Court 1 uses the main times; other courts can have their own when booked differently.
@@ -1652,6 +1714,7 @@ details.rk-how p{margin:8px 0 0}
     var o = {rotate: !!(mk.rotate && isGames(mk))};
     for (var k in extra) o[k] = extra[k];
     if (mk.format === "full") o.sets = mk.sets || "3";
+    if (+mk.mins > 0) o.mins = +mk.mins;
     if (usePlan(mk)) o.courtTimes = courtTimesOf(mk);
     var names = cleanCourtNames(mk);
     if (names.length) o.courtNames = names;
@@ -2018,7 +2081,7 @@ details.rk-how p{margin:8px 0 0}
     var card = el("div",{cls:"card"},[el("h3",{text:"Swap a player"}),
       el("p",{cls:"note", text:"Someone injured or tired? Only their games change: a resting player fills in, and the rest of the schedule stays the same. Fill-in games count for the Tour Rankings but not for the fill-in's event total."})]);
     var open = ms.filter(function(m){ return !scored(m); });
-    var outs = {}; open.forEach(function(m){ m.a.concat(m.b).forEach(function(id){ outs[id] = 1; }); });
+    var outs = {}; open.forEach(function(m){ m.a.concat(m.b).forEach(function(id){ if (S.players[id]) outs[id] = 1; }); });
     var sw = UI.sw && UI.sw.stop === stop.id ? UI.sw : (UI.sw = {stop:stop.id, out:"", all:true, picks:{}});
     var who = el("select",{"aria-label":"Who's out"}); who.appendChild(el("option",{value:"", text:"Pick a player"}));
     Object.keys(outs).sort(function(a, b){ return nameOf(a).localeCompare(nameOf(b)); }).forEach(function(id){ who.appendChild(el("option",{value:id, text:nameOf(id), selected: sw.out === id ? "selected" : null})); });
@@ -2128,7 +2191,7 @@ details.rk-how p{margin:8px 0 0}
     var su = stop.setup || {}, tm = su.courtTimes && su.courtTimes[0] ? su.courtTimes[0] : parseTimes(stop.time);
     var mk = {stopId:stop.id, level:stop.level || "social", format:stop.format || "americano", start:tm[0] || "", end:tm[1] || "", courts:stop.courts || 2, total:stop.total || 21,
       rounds:stop.rounds || 0, players:(stop.players || []).filter(function(id){ return S.players[id]; }), split:!!su.split, mx:!!su.mixed, rotate:!!su.rotate, sets:su.sets || "3",
-      courtNames:(su.courtNames || []).slice(), diffTimes:!!(su.courtTimes && su.courtTimes.length > 1), courtTimes:(su.courtTimes || []).slice(1).map(function(t){ return t.slice(); }),
+      courtNames:(su.courtNames || []).slice(), mins:su.mins || 0, diffTimes:!!(su.courtTimes && su.courtTimes.length > 1), courtTimes:(su.courtTimes || []).slice(1).map(function(t){ return t.slice(); }),
       pairs:null, fixed:[], swap:null, sched:null, newName:"", newGender:"M", similar:null, msg:""};
     if (allPairs(mk)) mk.pairs = (su.fixed || []).map(function(p){ return p.slice(); }); else mk.fixed = (su.fixed || []).map(function(p){ return p.slice(); });
     return mk;
@@ -2175,7 +2238,7 @@ details.rk-how p{margin:8px 0 0}
       ["Americano or Mexicano, 21 points", 15, "about 12 minutes of play"],
       ["Americano or Mexicano, 24 points", 17, "about 14 minutes of play"],
       ["Americano or Mexicano, 32 points", 20, "about 17 minutes of play"],
-      ["Match: short (6 games in total)", 25, "tiebreak at 3–3"],
+      ["Match: short (6 games in total)", 18, "tiebreak at 3–3"],
       ["Match: 1 full set", 40, "first to 6 games, tiebreak at 6–6"],
       ["Match: best of 3 sets", 90, "same as Playtomic's 90 minutes"]
     ];
@@ -2183,7 +2246,7 @@ details.rk-how p{margin:8px 0 0}
     rows.forEach(function(r){ tb.appendChild(el("tr",null,[el("td",null,[el("b",{text:r[0]}), el("div",{cls:"sub", text:r[2]})]), el("td",{text:r[1] + " min"})])); });
     // Closed until tapped; remembers being open across the 20-second refreshes.
     var det = el("details",{cls:"card how", open: UI.rtOpen ? "open" : null},[el("summary",{text:"How long a round takes"}),
-      el("p",{cls:"note", text:"The website uses these times to work out how many rounds fit in your court booking. Each time includes a couple of minutes to change courts."}),
+      el("p",{cls:"note", text:"The website uses these times to work out how many rounds fit in your court booking. Each time includes a couple of minutes to change courts. Court Captains can pick their own minutes per match when they make the schedule."}),
       el("table",{cls:"standings rtimes"},[el("thead",null,[el("tr",null,[el("th",{text:"Game"}), el("th",{text:"Per round"})])]), tb]),
       el("p",{cls:"note", text:"Example: courts booked 8:00 to 10:00am (120 minutes) with Americano to 21 points gives 120 ÷ 15 = 8 rounds. If Court 2 is only booked until 9:30am, it hosts 6 of those rounds, and in the last 2 rounds only Court 1 plays while the others rest."})])
     det.addEventListener("toggle", function(){ UI.rtOpen = det.open; });
@@ -2343,6 +2406,11 @@ details.rk-how p{margin:8px 0 0}
     tt.addEventListener("change", function(){ mk.total = +tt.value; changed(); commit(); });
     card.appendChild(field("Points per game", tt));
   }
+  var dm = roundMins({format:mk.format, total:mk.total, sets:mk.sets}), ms = el("select");
+  ms.appendChild(el("option",{value:"0", text:"Usual: " + dm + " minutes", selected: +mk.mins > 0 ? null : "selected"}));
+  [10,12,13,14,15,16,17,18,20,22,24,25,30,35,40,45,60,90].forEach(function(n){ if (n !== dm) ms.appendChild(el("option",{value:String(n), text:n + " minutes", selected: +mk.mins === n ? "selected" : null})); });
+  ms.addEventListener("change", function(){ mk.mins = +ms.value; changed(); commit(); });
+  card.appendChild(field("Minutes per match", ms, "Including changing courts. Shorter matches fit more rounds into your booking."));
   }
   // With no stop: the create form (where, when, level). With a stop: its players and schedule, which can be changed until the games are scored.
   function createCard(stop){
@@ -2592,6 +2660,9 @@ details.rk-how p{margin:8px 0 0}
       var off = fromRound - 1, left = fit ? Math.max(1, fit - off) : 6;
       var fixedNow = needPairs ? mk.pairs : (split ? [] : (mk.fixed || []).filter(function(pr){ return !mx || (S.players[pr[0]].gender === "F") !== (S.players[pr[1]].gender === "F"); }));
       mk.cut = 0;
+      // Plain rotation: as many rounds as fit, leaving room for an extra match so everyone plays the same number of games
+      var even = !needPairs && !mx && !split && !plan && !off && fit > 0 && mk.format !== "mexicano" && !fixedNow.length ? evenPlan(picked.length, mk.courts, fit) : null;
+      if (even) left = even.rounds;
       // With different court times, each round only uses the courts still booked then
       var cfn = plan ? function(r){ var sl = plan.slots[r - 1 + off]; return sl ? sl.courts.length : 0; } : null;
       SEED = mk.stopId ? dayHistory(mk.stopId) : null;
@@ -2612,6 +2683,7 @@ details.rk-how p{margin:8px 0 0}
         return {cup:g.cup, courts:g.courts, list:l};
       }));
       SEED = null;
+      mk.vols = even && even.extra ? evenUp(list, picked, mk.courts) : 0;
       if (mk.format === "mexicano" && !off) mk.rounds = fit || 6;
       mk.setup = eventSetup(mk, {split:split, mixed:mx, fixed:fixedNow});
       mk.sched = list.map(function(m){
@@ -2619,6 +2691,7 @@ details.rk-how p{margin:8px 0 0}
         return {round:m.round, court:court, time: plan ? planTime(plan, m.round) : (mk.start ? addMins(mk.start, (m.round - 1) * mins) : ""), cup:m.cup, a1:m.a[0], a2:m.a[1], b1:m.b[0], b2:m.b[1]}; });
       mk.msg = ""; return true;
     }
+    if (mk.format !== "mexicano" && !needPairs && !(mixed && (mk.split || mk.mx)) && !(mk.fixed || []).length && fromRound === 1){ var gd = evenGuide(mk, picked.length, function(m){ mk.mins = m; changed(); commit(); }); if (gd) card.appendChild(gd); }
     card.appendChild(el("button",{cls:"btn ghost wide", text: mk.sched ? "Shuffle the schedule again" : "Make the schedule", onclick:function(){ build(); commit(); }}));
     if (mk.sched){
       var rounds = maxRound(mk.sched), pv = el("div",{cls:"preview"});
@@ -2633,6 +2706,7 @@ details.rk-how p{margin:8px 0 0}
       }
       var counts = picked.map(function(id){ return playing[id] || 0; });
       card.appendChild(el("p",{cls:"note", text: mk.format === "mexicano" ? "This is round " + r0 + (mk.rounds ? " of " + mk.rounds : "") + ". You'll make each next round from Game On once the scores are in." : (mk.sched.length + " games over " + (rounds - r0 + 1) + " rounds. Everyone plays " + (Math.min.apply(null, counts) === Math.max.apply(null, counts) ? counts[0] : Math.min.apply(null, counts) + " to " + Math.max.apply(null, counts)) + " games." + (mk.cut ? " Every pair meeting every other pair would take " + mk.cut + " rounds, so only the first " + rounds + " fit in your court time." : (fitRounds(mk) ? "" : " Add the court times above to fit the rounds to your booking.")))}));
+      if (mk.vols) card.appendChild(el("p",{cls:"note", text:"The last match evens everyone up, and " + mk.vols + (mk.vols === 1 ? " spot is" : " spots are") + " left for volunteers. On the day, tap Add volunteer on that match. A volunteer's game counts for their Tour Ranking, not their event total."}));
       card.appendChild(pv);
       // Tell the captain when some players get fewer games, and offer an extra round for them
       if (mk.format !== "mexicano" && fromRound === 1){
